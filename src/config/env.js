@@ -29,7 +29,8 @@ const config = {
   phoneNumberId: requireEnv("PHONE_NUMBER_ID"),
 
   // URL base da Graph API (versionada)
-  graphApiUrl: "https://graph.facebook.com/v18.0",
+  // A v18.0 já não é suportada pela Meta; a versão pode mudar-se no .env
+  graphApiUrl: `https://graph.facebook.com/${process.env.GRAPH_API_VERSION || "v22.0"}`,
 
   // --- OpenAI ---
   openaiApiKey: process.env.OPENAI_API_KEY || "", // opcional; sem ela o fallback de IA é desabilitado

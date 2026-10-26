@@ -47,10 +47,6 @@ Lembre-se de actualizar também `site/index.html`.
 
 ## Ligar ao WhatsApp
 
-1. Criar uma app em developers.facebook.com, produto WhatsApp, e gerar um token permanente.
-2. Preencher `WHATSAPP_TOKEN`, `PHONE_NUMBER_ID` e um `VERIFY_TOKEN` à escolha no `.env`.
-3. Pôr o servidor acessível por HTTPS (Cloudflare Tunnel, como no ClipForge) e registar
-   `https://<domínio>/webhook` no painel da Meta com o mesmo `VERIFY_TOKEN`.
-
-**Atenção:** um número ligado à WhatsApp Cloud API deixa de funcionar na app WhatsApp Business do
-telemóvel. Usar um número próprio para o bot, ou manter o 946 397 096 só na app.
+O bot usa o número **955 705 188**; a equipa continua no WhatsApp Business **946 397 096**, para onde
+o bot encaminha marcações, reclamações e pedidos de falar com uma pessoa.
+Passo a passo completo (Meta, token, Cloudflare Tunnel, webhook): [docs/LIGAR-WHATSAPP.md](docs/LIGAR-WHATSAPP.md).

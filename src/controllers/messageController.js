@@ -70,6 +70,14 @@ const MENUS = {
 };
 
 // -------------------------------------------------------
+// Este número é só do bot: a equipa atende no WhatsApp do salão
+// -------------------------------------------------------
+const TEAM_CONTACT = {
+  pt: "👤 Para falar com a nossa equipa, use o WhatsApp do salão: *946 397 096*\n👉 https://wa.me/244946397096\n\nAtendemos de segunda a sexta das 8h às 21h, sábado e domingo das 9h às 20h. 💖",
+  en: "👤 To talk to our team, message the salon on WhatsApp: *+244 946 397 096*\n👉 https://wa.me/244946397096\n\nOpen Mon–Fri 8am–9pm, Sat–Sun 9am–8pm. 💖",
+};
+
+// -------------------------------------------------------
 // Comandos especiais do sistema
 // -------------------------------------------------------
 const COMMANDS = {
@@ -153,8 +161,8 @@ async function handleMenuSelection(to, number, lang) {
   if (key === null) {
     // Opção 7: falar com atendente
     const text = lang === "en"
-      ? "👤 Our team will reply here as soon as possible (Mon–Fri 8am–9pm, Sat–Sun 9am–8pm). ⏳\n\nFeel free to leave your question in the meantime!"
-      : "👤 A nossa equipa vai responder-lhe aqui o mais rápido possível (seg a sex 8h–21h, sáb e dom 9h–20h). ⏳\n\nEntretanto, pode deixar a sua dúvida!";
+      ? TEAM_CONTACT.en
+      : TEAM_CONTACT.pt;
     await whatsappService.sendTextMessage(to, text);
     return true;
   }
@@ -250,8 +258,8 @@ async function handleIncomingMessage(req, res) {
     if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
       logger.info("Solicitação de humano detectada", { from });
       const humanText = lang === "en"
-        ? `👤 Sure! Our team will reply here as soon as possible during opening hours (Mon–Fri 8am–9pm, Sat–Sun 9am–8pm). 🕐`
-        : `👤 Claro! A nossa equipa vai responder-lhe aqui o mais rápido possível, dentro do horário (seg a sex 8h–21h, sáb e dom 9h–20h). 🕐`;
+        ? TEAM_CONTACT.en
+        : TEAM_CONTACT.pt;
       await whatsappService.sendTextMessage(from, humanText);
       return;
     }
@@ -260,8 +268,8 @@ async function handleIncomingMessage(req, res) {
     if (containsTrigger(normalizedText, KEYWORD_FLOWS.complaintTriggers)) {
       logger.info("Reclamação detectada", { from });
       const complaintText = lang === "en"
-        ? `😔 I'm sorry to hear you're having an issue.\n\nPlease describe your problem in detail and a supervisor will review your case with priority. Your feedback is very important to us!`
-        : `😔 Lamentamos muito pelo sucedido.\n\nConte-nos o que aconteceu, com o dia e o serviço, e a responsável do salão vai tratar do seu caso com prioridade. A sua opinião é muito importante para nós! 💖`;
+        ? `😔 We're sorry about that.\n\nPlease tell the salon manager what happened on WhatsApp *+244 946 397 096*: https://wa.me/244946397096\nWe'll handle it with priority. 💖`
+        : `😔 Lamentamos muito pelo sucedido.\n\nConte à responsável do salão o que aconteceu, com o dia e o serviço, no WhatsApp *946 397 096*: https://wa.me/244946397096\nVamos tratar do seu caso com prioridade. 💖`;
       await whatsappService.sendTextMessage(from, complaintText);
       return;
     }
