@@ -33,6 +33,7 @@ const config = {
 
   // --- OpenAI ---
   openaiApiKey: process.env.OPENAI_API_KEY || "", // opcional; sem ela o fallback de IA é desabilitado
+  openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
   // --- Comportamento ---
   defaultLanguage: process.env.DEFAULT_LANGUAGE || "pt",

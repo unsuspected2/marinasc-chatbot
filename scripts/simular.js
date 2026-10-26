@@ -1,0 +1,60 @@
+// ============================================================
+// scripts/simular.js
+// Testa as respostas do bot no terminal, sem WhatsApp nem Meta.
+//
+// Uso:
+//   npm run simular                      → corre as perguntas de exemplo
+//   npm run simular -- "quanto custa bobes?"   → testa uma mensagem
+//
+// A OpenAI só é chamada se OPENAI_API_KEY estiver no .env.
+// ============================================================
+
+// Valores fictícios para o config/env.js não falhar sem .env
+process.env.VERIFY_TOKEN ||= "simulacao";
+process.env.WHATSAPP_TOKEN ||= "simulacao";
+process.env.PHONE_NUMBER_ID ||= "simulacao";
+
+const whatsappService = require("../src/services/whatsappService");
+
+// Em vez de enviar para a Graph API, mostra a resposta no terminal
+whatsappService.sendTextMessage = async (_to, text) => {
+  console.log(`🤖 ${text.replace(/\n/g, "\n   ")}\n`);
+};
+whatsappService.markAsRead = async () => {};
+
+const { handleIncomingMessage } = require("../src/controllers/messageController");
+
+const EXEMPLOS = [
+  "Olá",
+  "1",
+  "quanto custa cordoletes com cachos?",
+  "oi, qual é o preço das sobrancelhas?",
+  "Qual é o horário de domingo?",
+  "onde fica o salão?",
+  "quero marcar unhas de gel para sábado",
+  "fazem box braids?",
+  "quero falar com uma pessoa",
+];
+
+function payload(text) {
+  return {
+    entry: [{
+      changes: [{
+        value: {
+          messages: [{ id: "simulado", from: "244900000000", type: "text", text: { body: text } }],
+          contacts: [{ profile: { name: "Cliente" } }],
+        },
+      }],
+    }],
+  };
+}
+
+const fakeRes = { status: () => ({ json: () => {} }) };
+
+(async () => {
+  const mensagens = process.argv.length > 2 ? [process.argv.slice(2).join(" ")] : EXEMPLOS;
+  for (const text of mensagens) {
+    console.log(`👩🏾 ${text}`);
+    await handleIncomingMessage({ body: payload(text) }, fakeRes);
+  }
+})();

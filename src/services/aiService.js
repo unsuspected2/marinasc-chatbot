@@ -36,17 +36,30 @@ const MAX_HISTORY = 10; // máximo de pares usuário/assistente na memória
 // -------------------------------------------------------
 // Prompt do sistema — define a "personalidade" do bot
 // -------------------------------------------------------
-const SYSTEM_PROMPT_PT = `Você é um assistente de suporte ao cliente prestativo, educado e objetivo.
-Responda sempre em português do Brasil.
-Seja direto e claro. Evite respostas longas.
-Se não souber a resposta, diga que vai verificar e que alguém entrará em contato.
-Nunca invente informações sobre preços, prazos ou políticas da empresa.`;
+// Informação do salão: vem do faq.json para não haver dois sítios com preços
+const faq = require("../data/faq.json");
+const SALON_INFO = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario"]
+  .map(k => faq[k].replace(/\*/g, ""))
+  .join("\n\n");
 
-const SYSTEM_PROMPT_EN = `You are a helpful, polite, and objective customer support assistant.
-Always respond in English.
-Be direct and clear. Avoid lengthy responses.
-If you don't know the answer, say you'll check and someone will follow up.
-Never make up information about prices, deadlines, or company policies.`;
+const SYSTEM_PROMPT_PT = `És a assistente virtual do MARINASC Salão de Beleza (Cabeleireiro, Manicure e Spa), na Centralidade do Kilamba, Luanda. Lema: Beleza · Cuidado · Confiança.
+Responde sempre em português de Angola, de forma simpática, próxima e curta (no máximo 4 frases), como no WhatsApp.
+Usa só a informação abaixo. Nunca inventes preços, promoções, disponibilidade ou serviços que não estejam na lista.
+Se o serviço estiver "sob consulta" ou não constar, diz que a equipa confirma o valor e pede uma foto do resultado desejado.
+Para marcar: pede o serviço, o dia e a hora, e diz que a equipa confirma a vaga por aqui. Nunca confirmes tu a marcação.
+Se não souberes a resposta, diz que a equipa vai responder em breve.
+
+INFORMAÇÃO DO SALÃO:
+${SALON_INFO}`;
+
+const SYSTEM_PROMPT_EN = `You are the virtual assistant of MARINASC Beauty Salon (hair, nails and spa) in Centralidade do Kilamba, Luanda, Angola.
+Always reply in English, warm and short (max 4 sentences), WhatsApp style. Prices are in Angolan Kwanza (Kz).
+Only use the information below (it is in Portuguese; translate it). Never make up prices, promotions, availability or services.
+If a service is "sob consulta" (on request) or not listed, say the team will confirm the price.
+To book: ask for the service, day and time, and say the team will confirm here. Never confirm a booking yourself.
+
+SALON INFORMATION:
+${SALON_INFO}`;
 
 // -------------------------------------------------------
 // Detecta o idioma predominante da mensagem.
@@ -116,7 +129,7 @@ async function getAIResponse(userId, userMessage) {
   if (!openai) {
     return config.defaultLanguage === "en"
       ? "I'm sorry, I couldn't process your request right now. Please contact us directly."
-      : "Desculpe, não consegui processar sua solicitação agora. Entre em contato diretamente conosco.";
+      : "Obrigada pela mensagem! 💖 A nossa equipa vai responder-lhe aqui em breve. Para ver as opções, escreva *menu*.";
   }
 
   try {
@@ -141,10 +154,10 @@ async function getAIResponse(userId, userMessage) {
 
     // Chamada à API da OpenAI
     const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",   // ou "gpt-4o" para mais capacidade
+      model: config.openaiModel,
       messages,
       max_tokens: 300,           // resposta curta e objetiva
-      temperature: 0.7,          // criatividade moderada
+      temperature: 0.3,          // baixa: respostas fiéis à tabela de preços
     });
 
     const assistantMessage = completion.choices[0].message.content.trim();
@@ -168,7 +181,7 @@ async function getAIResponse(userId, userMessage) {
     // Mensagem de fallback amigável
     return config.defaultLanguage === "en"
       ? "Sorry, I'm having trouble responding right now. Please try again in a moment or contact us directly. 🙏"
-      : "Desculpe, estou com dificuldades para responder agora. Tente novamente em instantes ou entre em contato diretamente conosco. 🙏";
+      : "Obrigada pela mensagem! 💖 A nossa equipa vai responder-lhe aqui em breve. Para ver as opções, escreva *menu*.";
   }
 }
 

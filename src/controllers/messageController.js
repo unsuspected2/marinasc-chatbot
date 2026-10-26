@@ -24,16 +24,17 @@ const logger          = require("../utils/logger");
 const KEYWORD_FLOWS = {
   // Palavras que disparam o menu principal
   menuTriggers: ["menu", "opções", "opcoes", "options", "ajuda", "help",
-                  "início", "inicio", "start", "oi", "olá", "ola",
+                  "início", "inicio", "start", "oi", "olá", "ola", "boas",
                   "hello", "hi", "hey", "bom dia", "boa tarde", "boa noite"],
 
   // Palavras que indicam interesse em falar com humano
   humanTriggers: ["atendente", "humano", "pessoa", "humana", "real person",
-                   "falar com alguém", "falar com alguem", "speak to someone"],
+                   "falar com alguém", "falar com alguem", "speak to someone",
+                   "cabeleireira", "gerente"],
 
   // Palavras que indicam reclamação
   complaintTriggers: ["reclamação", "reclamacao", "complaint", "problema",
-                       "errado", "errada", "errei", "incorreto", "insatisfeito"],
+                       "errado", "errada", "incorreto", "insatisfeito", "insatisfeita"],
 };
 
 // -------------------------------------------------------
@@ -41,30 +42,30 @@ const KEYWORD_FLOWS = {
 // -------------------------------------------------------
 const MENUS = {
   pt: {
-    title: "👋 Olá! Bem-vindo à *WawaBusiness*! 🚀\n\nComo posso te ajudar?",
+    title: "💖 Olá! Bem-vinda ao *MARINASC Salão de Beleza*\nBeleza · Cuidado · Confiança\n\nComo podemos ajudar?",
     options: [
-      "🎬 Streaming (Netflix / Prime Video)",
-      "🖥️ Máquina de Faturamento",
-      "🛡️ Segurança Digital",
-      "🧹 Manutenção & Formatação",
-      "☁️ Armazenamento em Nuvem",
-      "🎁 Programa de Indicação",
-      "👤 Falar com um atendente",
+      "💇🏾‍♀️ Tranças e twists (preços)",
+      "💅🏾 Unhas (preços)",
+      "✨ Sobrancelhas, pestanas e henna",
+      "💆🏾‍♀️ Cabelo e aplicação",
+      "📍 Horário e localização",
+      "📅 Fazer uma marcação",
+      "👤 Falar com a nossa equipa",
     ],
-    footer: "\nDigite o número ou faça a sua pergunta directamente! 😊",
+    footer: "\nDigite o número ou escreva a sua pergunta. 😊",
   },
   en: {
-    title: "👋 Hello! Welcome to *WawaBusiness*! 🚀\n\nHow can I help you?",
+    title: "💖 Hello! Welcome to *MARINASC Beauty Salon* in Kilamba, Luanda.\n\nHow can we help?",
     options: [
-      "🎬 Streaming (Netflix / Prime Video)",
-      "🖥️ Billing Software",
-      "🛡️ Digital Security",
-      "🧹 Maintenance & Formatting",
-      "☁️ Cloud Storage",
-      "🎁 Referral Program",
-      "👤 Talk to an agent",
+      "💇🏾‍♀️ Braids and twists (prices)",
+      "💅🏾 Nails (prices)",
+      "✨ Brows, lashes and henna",
+      "💆🏾‍♀️ Hair and extensions",
+      "📍 Opening hours and location",
+      "📅 Book an appointment",
+      "👤 Talk to our team",
     ],
-    footer: "\nType the number or ask your question directly! 😊",
+    footer: "\nType a number or ask your question. Prices are in Kwanza (Kz). 😊",
   },
 };
 
@@ -85,8 +86,8 @@ const COMMANDS = {
 
 async function handleStart(to, name, lang) {
   const greeting = lang === "en"
-    ? `👋 Welcome, ${name}! I'm here to help. Here are the available options:`
-    : `👋 Bem-vindo(a), ${name}! Estou aqui para ajudar. Veja as opções disponíveis:`;
+    ? `💖 Welcome to MARINASC, ${name}! Here are the options:`
+    : `💖 Olá, ${name}! Bem-vinda ao MARINASC Salão de Beleza. Veja as opções:`;
 
   await sendMenu(to, lang, greeting);
 }
@@ -94,7 +95,7 @@ async function handleStart(to, name, lang) {
 async function handleHelp(to, _name, lang) {
   const text = lang === "en"
     ? `ℹ️ *Help*\n\nYou can:\n• Ask questions directly\n• Type a number from the menu\n• Use commands:\n  /start — Restart\n  /menu — Show menu\n  /reset — Clear conversation history\n\nNeed human support? Just ask!`
-    : `ℹ️ *Ajuda*\n\nVocê pode:\n• Fazer perguntas diretamente\n• Digitar um número do menu\n• Usar comandos:\n  /start — Reiniciar\n  /menu — Ver menu\n  /reset — Limpar histórico da conversa\n\nPrecisa de atendimento humano? É só pedir!`;
+    : `ℹ️ *Ajuda*\n\nPode:\n• Fazer perguntas directamente (ex.: "quanto custa cordoletes?")\n• Digitar um número do menu\n• Usar comandos:\n  /start — Recomeçar\n  /menu — Ver menu\n  /reset — Apagar o histórico da conversa\n\nPrefere falar com a nossa equipa? É só pedir!`;
 
   await whatsappService.sendTextMessage(to, text);
 }
@@ -114,7 +115,7 @@ async function handleReset(to, _name, lang) {
 
 async function handleFaqList(to, _name, lang) {
   const faqs = faqService.getAllFaqs();
-  const keys = Object.keys(faqs).filter((k, i, arr) => arr.indexOf(k) === i);
+  const keys = Object.keys(faqs).filter(k => !k.startsWith("menu_"));
   const text = lang === "en"
     ? `📚 I can answer questions about:\n${keys.slice(0, 15).join(", ")}`
     : `📚 Posso responder sobre:\n${keys.slice(0, 15).join(", ")}`;
@@ -138,8 +139,8 @@ async function sendMenu(to, lang, customTitle) {
 async function handleMenuSelection(to, number, lang) {
   // Mapeia número → FAQ key ou resposta
   const menuMap = {
-    pt: ["streaming", "faturamento", "seguranca", "manutencao", "nuvem", "indicacao", null],
-    en: ["streaming", "faturamento", "seguranca", "manutencao", "nuvem", "indicacao", null],
+    pt: ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null],
+    en: ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null],
   };
 
   const map = menuMap[lang] || menuMap.pt;
@@ -152,8 +153,8 @@ async function handleMenuSelection(to, number, lang) {
   if (key === null) {
     // Opção 7: falar com atendente
     const text = lang === "en"
-      ? "👤 I'm connecting you with a human agent. Please wait a moment... ⏳\n\nIn the meantime, feel free to ask your question and we'll reply as soon as possible!"
-      : "👤 Estou te conectando com um atendente humano. Aguarde um momento... ⏳\n\nEnquanto isso, pode deixar sua dúvida que respondemos assim que possível!";
+      ? "👤 Our team will reply here as soon as possible (Mon–Fri 8am–9pm, Sat–Sun 9am–8pm). ⏳\n\nFeel free to leave your question in the meantime!"
+      : "👤 A nossa equipa vai responder-lhe aqui o mais rápido possível (seg a sex 8h–21h, sáb e dom 9h–20h). ⏳\n\nEntretanto, pode deixar a sua dúvida!";
     await whatsappService.sendTextMessage(to, text);
     return true;
   }
@@ -183,7 +184,11 @@ function normalizeText(text) {
 // Verifica se texto contém algum trigger de uma lista
 // -------------------------------------------------------
 function containsTrigger(normalizedText, triggers) {
-  return triggers.some(t => normalizedText.includes(normalizeText(t)));
+  // Palavra inteira: evita que "oi" dispare dentro de "noite" ou "depois"
+  return triggers.some(t => {
+    const escaped = normalizeText(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(normalizedText);
+  });
 }
 
 // ============================================================
@@ -234,9 +239,10 @@ async function handleIncomingMessage(req, res) {
     }
 
     // C. Keywords que disparam o menu principal
-    if (containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers)) {
+    // ("oi, quanto custa bobes?" segue para o FAQ em vez de mostrar o menu)
+    if (containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers) && !faqService.findAnswer(text)) {
       logger.info("Trigger de menu detectado", { from, text });
-      await sendMenu(from, lang, `👋 Olá, ${name}! Como posso ajudar?`);
+      await sendMenu(from, lang, lang === "en" ? `💖 Hello, ${name}! How can we help?` : `💖 Olá, ${name}! Bem-vinda ao MARINASC. Como podemos ajudar?`);
       return;
     }
 
@@ -244,8 +250,8 @@ async function handleIncomingMessage(req, res) {
     if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
       logger.info("Solicitação de humano detectada", { from });
       const humanText = lang === "en"
-        ? `👤 Sure! I'm noting your request for human support.\n\nOne of our agents will contact you at *${from}* as soon as possible during business hours. 🕐`
-        : `👤 Claro! Estou registrando sua solicitação de atendimento humano.\n\nUm de nossos atendentes irá te contatar no número *${from}* assim que possível, dentro do horário comercial. 🕐`;
+        ? `👤 Sure! Our team will reply here as soon as possible during opening hours (Mon–Fri 8am–9pm, Sat–Sun 9am–8pm). 🕐`
+        : `👤 Claro! A nossa equipa vai responder-lhe aqui o mais rápido possível, dentro do horário (seg a sex 8h–21h, sáb e dom 9h–20h). 🕐`;
       await whatsappService.sendTextMessage(from, humanText);
       return;
     }
@@ -255,7 +261,7 @@ async function handleIncomingMessage(req, res) {
       logger.info("Reclamação detectada", { from });
       const complaintText = lang === "en"
         ? `😔 I'm sorry to hear you're having an issue.\n\nPlease describe your problem in detail and a supervisor will review your case with priority. Your feedback is very important to us!`
-        : `😔 Lamentamos saber que você está enfrentando um problema.\n\nPor favor, descreva sua situação em detalhes e um supervisor irá analisar seu caso com prioridade. Seu feedback é muito importante para nós!`;
+        : `😔 Lamentamos muito pelo sucedido.\n\nConte-nos o que aconteceu, com o dia e o serviço, e a responsável do salão vai tratar do seu caso com prioridade. A sua opinião é muito importante para nós! 💖`;
       await whatsappService.sendTextMessage(from, complaintText);
       return;
     }

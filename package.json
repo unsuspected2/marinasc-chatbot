@@ -1,11 +1,12 @@
 {
-  "name": "whatsapp-chatbot",
+  "name": "marinasc-chatbot",
   "version": "1.0.0",
-  "description": "WhatsApp Chatbot com Node.js, Express e OpenAI",
+  "description": "Chatbot de WhatsApp do MARINASC Salão de Beleza (Kilamba, Luanda)",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+    "simular": "node scripts/simular.js"
   },
   "dependencies": {
     "axios": "^1.6.0",

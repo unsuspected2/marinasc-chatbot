@@ -49,6 +49,11 @@ app.use((req, res, next) => {
 });
 
 // ============================================================
+// SITE DO SALÃO (pasta site/) — servido na raiz "/"
+// ============================================================
+app.use(express.static(require("path").join(__dirname, "../site")));
+
+// ============================================================
 // ROTAS
 // ============================================================
 app.use("/", routes);
@@ -94,7 +99,7 @@ process.on("uncaughtException", (err) => {
 // ============================================================
 const server = app.listen(config.port, () => {
   logger.info("=".repeat(55));
-  logger.info(`🤖 WhatsApp Chatbot iniciado com sucesso!`);
+  logger.info(`💖 Chatbot MARINASC iniciado com sucesso!`);
   logger.info(`📡 Servidor rodando na porta: ${config.port}`);
   logger.info(`🔗 URL local: http://localhost:${config.port}`);
   logger.info(`✅ Webhook: http://localhost:${config.port}/webhook`);

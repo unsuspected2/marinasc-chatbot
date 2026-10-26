@@ -37,7 +37,7 @@ router.post("/webhook", controller.handleIncomingMessage);
 router.get("/health", (req, res) => {
   res.status(200).json({
     status: "ok",
-    service: "whatsapp-chatbot",
+    service: "marinasc-chatbot",
     timestamp: new Date().toISOString(),
     uptime: `${Math.floor(process.uptime())}s`,
   });
@@ -49,7 +49,7 @@ router.get("/health", (req, res) => {
 // -------------------------------------------------------
 router.get("/", (req, res) => {
   res.status(200).json({
-    message: "WhatsApp Chatbot API está no ar! 🤖",
+    message: "Chatbot MARINASC no ar! 💖",
     endpoints: {
       webhook_verify: "GET /webhook",
       webhook_receive: "POST /webhook",
