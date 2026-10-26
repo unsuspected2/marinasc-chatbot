@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MariNasc | Salão de Beleza no Kilamba</title>
+<meta name="description" content="Salão de beleza MariNasc na Centralidade do Kilamba, C19. Tranças, twists, aplicação de cabelo, unhas de gel e porcelana, sobrancelhas e pestanas. Marcações pelo WhatsApp 946 397 096.">
+<link rel="icon" href="media/logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* ===== Cores da marca (do logótipo e da tabela de valores) ===== */
+  :root {
+    --rosa: #d63f78;
+    --rosa-claro: #fbe3ec;
+    --azul: #0d3b78;
+    --azul-claro: #1f6fb5;
+    --dourado: #c9a24b;
+    --creme: #fdf8f6;
+    --texto: #1f1a2e;
+    --suave: #5f5870;
+    --whats: #25d366;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Inter, system-ui, sans-serif; color: var(--texto); background: var(--creme); line-height: 1.6; }
+  h1, h2 { font-family: "Playfair Display", Georgia, serif; line-height: 1.2; }
+  a { color: inherit; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  section { padding: 56px 0; }
+  h2 { font-size: 1.9rem; margin-bottom: 8px; color: var(--azul); }
+  .sub { color: var(--suave); margin-bottom: 28px; }
+
+  header { position: sticky; top: 0; z-index: 10; background: rgba(253,248,246,.96); border-bottom: 1px solid #ecdfe6; }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
+  .logo img { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--rosa); }
+  .logo b { font-family: "Playfair Display", serif; font-size: 1.35rem; color: var(--azul); }
+  .logo b span { color: var(--dourado); }
+
+  .btn { display: inline-flex; align-items: center; gap: 8px; background: var(--whats); color: #fff; font-weight: 600; text-decoration: none; padding: 14px 22px; border-radius: 999px; box-shadow: 0 4px 14px rgba(37,211,102,.35); }
+  .btn.small { padding: 9px 16px; font-size: .9rem; box-shadow: none; }
+  .btn svg { width: 20px; height: 20px; fill: currentColor; }
+
+  .hero { background: linear-gradient(135deg, var(--rosa-claro) 0%, var(--creme) 55%, #e6eef8 100%); padding: 56px 0 64px; }
+  .hero .wrap { display: grid; gap: 32px; align-items: center; }
+  .lema { color: var(--dourado); font-weight: 600; letter-spacing: .14em; text-transform: uppercase; font-size: .8rem; }
+  .hero h1 { font-size: clamp(2rem, 6vw, 3.2rem); color: var(--azul); margin-top: 8px; }
+  .hero h1 em { color: var(--rosa); font-style: normal; }
+  .hero p { font-size: 1.1rem; color: var(--suave); margin: 16px 0 28px; max-width: 36ch; }
+  .hero video { width: 100%; max-width: 380px; justify-self: center; aspect-ratio: 9/16; object-fit: cover; border-radius: 24px; box-shadow: 0 18px 40px rgba(13,59,120,.25); background: #ddd; }
+  .info-rapida { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 20px; font-size: .95rem; color: var(--suave); }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+  .tabs a { text-decoration: none; padding: 8px 14px; border-radius: 999px; background: #fff; border: 1px solid #e3d6de; font-size: .9rem; font-weight: 500; }
+  .grupo { margin-bottom: 32px; scroll-margin-top: 80px; }
+  .grupo h3 { font-size: 1.15rem; color: var(--rosa); margin-bottom: 12px; }
+  .lista { background: #fff; border-radius: 16px; border: 1px solid #ecdfe6; overflow: hidden; }
+  .linha { display: flex; justify-content: space-between; gap: 16px; padding: 13px 18px; border-bottom: 1px solid #f3eaef; }
+  .linha:last-child { border-bottom: 0; }
+  .linha .preco { font-weight: 600; color: var(--azul); white-space: nowrap; }
+  .linha small { display: block; color: var(--suave); font-size: .82rem; }
+  .nota { color: var(--suave); font-size: .9rem; margin-top: 8px; }
+
+  .galeria { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .galeria figure { position: relative; border-radius: 16px; overflow: hidden; background: #ddd; aspect-ratio: 9/16; }
+  .galeria video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .galeria figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px 10px 10px; color: #fff; font-size: .85rem; font-weight: 600; background: linear-gradient(transparent, rgba(0,0,0,.65)); }
+
+  .avaliacoes { display: grid; gap: 14px; }
+  .avaliacao { background: #fff; border-radius: 16px; padding: 20px; border-left: 4px solid var(--dourado); }
+  .estrelas { color: var(--dourado); letter-spacing: 2px; }
+  .avaliacao p { margin: 6px 0; }
+  .avaliacao span { color: var(--suave); font-size: .9rem; }
+
+  .visita { background: #fff; }
+  .visita .wrap { display: grid; gap: 28px; }
+  .visita dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 16px; }
+  .visita dt { font-weight: 600; }
+  .visita dd { color: var(--suave); }
+  .mapa { width: 100%; height: 300px; border: 0; border-radius: 16px; background: #eee; }
+
+  .cta-final { text-align: center; background: linear-gradient(135deg, var(--azul), var(--azul-claro)); color: #fff; }
+  .cta-final h2 { color: #fff; }
+  .cta-final p { opacity: .9; margin: 8px 0 24px; }
+
+  footer { background: var(--texto); color: #c9c3d6; font-size: .85rem; padding: 28px 0 90px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; }
+  footer a { color: #fff; }
+
+  .flutuante { position: fixed; right: 16px; bottom: 16px; z-index: 20; width: 58px; height: 58px; border-radius: 50%; background: var(--whats); display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 18px rgba(0,0,0,.25); }
+  .flutuante svg { width: 30px; height: 30px; fill: #fff; }
+
+  @media (min-width: 760px) {
+    .hero .wrap { grid-template-columns: 1.2fr .8fr; }
+    .avaliacoes { grid-template-columns: repeat(2, 1fr); }
+    .galeria { grid-template-columns: repeat(5, 1fr); }
+    .visita .wrap { grid-template-columns: 1fr 1fr; align-items: center; }
+    .grupos { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
+  }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute"><symbol id="wa" viewBox="0 0 24 24"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.2-.4.2-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.7 11.8 11.8 0 0 0 4.5 4c1.7.7 2.3.8 3.2.6.5-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.2-1.2-.1-.1-.3-.2-.5-.3z"/></symbol></svg>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="#"><img src="media/logo.jpg" alt="Logótipo MariNasc"><b>Mari<span>Nasc</span></b></a>
+    <a class="btn small" href="https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20fazer%20uma%20marca%C3%A7%C3%A3o."><svg><use href="#wa"/></svg>Marcar</a>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <div class="lema">Beleza · Cuidado · Confiança</div>
+      <h1>Salão de beleza <em>no Kilamba</em></h1>
+      <p>Tranças, twists, aplicação de cabelo, unhas, sobrancelhas e pestanas. Cabeleireiro, Manicure e Spa num só lugar.</p>
+      <a class="btn" href="https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20fazer%20uma%20marca%C3%A7%C3%A3o."><svg><use href="#wa"/></svg>Marcar pelo WhatsApp</a>
+      <div class="info-rapida">
+        <span>📍 Centralidade do Kilamba, C19, Apt. 41</span>
+        <span>🕘 Seg a Sex 8h–21h · Sáb e Dom 9h–20h</span>
+      </div>
+    </div>
+    <video src="media/trabalho1.mp4" poster="media/trabalho1.jpg" autoplay muted loop playsinline aria-label="Bobes com cachos feitos no salão"></video>
+  </div>
+</section>
+
+<section id="servicos">
+  <div class="wrap">
+    <h2>Serviços e preços</h2>
+    <p class="sub">Tabela de valores actualizada. Os preços podem variar com o comprimento e o volume.</p>
+    <nav class="tabs"><a href="#trancas">Tranças e twists</a><a href="#cabelo">Cabelo</a><a href="#unhas">Unhas</a><a href="#rosto">Sobrancelhas e pestanas</a></nav>
+
+    <div class="grupos">
+      <div class="grupo" id="trancas">
+        <h3>Tranças e twists</h3>
+        <div class="lista">
+          <div class="linha"><span>Bobes</span><span class="preco">14.500 Kz</span></div>
+          <div class="linha"><span>Bobes com cachos</span><span class="preco">16.500 Kz</span></div>
+          <div class="linha"><span>Cordoletes</span><span class="preco">15.000 Kz</span></div>
+          <div class="linha"><span>Cordoletes com cachos</span><span class="preco">17.500 Kz</span></div>
+          <div class="linha"><span>Twists</span><span class="preco">14.500 Kz</span></div>
+          <div class="linha"><span>Twists rústicos</span><span class="preco">16.000 Kz</span></div>
+          <div class="linha"><span>Micro twists</span><span class="preco">25.000 Kz</span></div>
+          <div class="linha"><span>Natural twists curto</span><span class="preco">20.000 Kz</span></div>
+          <div class="linha"><span>Natural twists médio</span><span class="preco">25.000 Kz</span></div>
+          <div class="linha"><span>Natural twists compridas</span><span class="preco">30.000 Kz</span></div>
+          <div class="linha"><span>Bobe americano fino</span><span class="preco">16.500 Kz</span></div>
+          <div class="linha"><span>Bobe americano de sanguita</span><span class="preco">20.000 Kz</span></div>
+          <div class="linha"><span>Viradas nagô</span><span class="preco">11.000 Kz</span></div>
+          <div class="linha"><span>Dreads</span><span class="preco">18.000 Kz</span></div>
+          <div class="linha"><span>French curls dreads</span><span class="preco">19.000 Kz</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="grupo" id="cabelo">
+          <h3>Cabelo</h3>
+          <div class="lista">
+            <div class="linha"><span>Aplicação de cabelo</span><span class="preco">10.000 Kz</span></div>
+            <!-- EDITAR: acrescentar lavagem, escova, tratamentos, penteados, etc. quando houver preços -->
+            <div class="linha"><span>Lavagem, tratamentos, escova e penteados</span><span class="preco">Pergunte-nos</span></div>
+          </div>
+        </div>
+
+        <div class="grupo" id="unhas">
+          <h3>Unhas</h3>
+          <div class="lista">
+            <div class="linha"><span>Aplicação de gelinho</span><span class="preco">3.000 Kz</span></div>
+            <div class="linha"><span>Gel na unha</span><span class="preco">4.000 Kz</span></div>
+            <div class="linha"><span>Porcelana na unha</span><span class="preco">5.000 Kz</span></div>
+            <div class="linha"><span>Aplicação de gel</span><span class="preco">7.000 Kz</span></div>
+            <div class="linha"><span>Aplicação de porcelana</span><span class="preco">8.000 Kz</span></div>
+            <div class="linha"><span>Alongamento de gel</span><span class="preco">8.000 Kz</span></div>
+            <div class="linha"><span>Alongamento de porcelana</span><span class="preco">10.000 Kz</span></div>
+            <div class="linha"><span>Pé</span><span class="preco">2.000 Kz</span></div>
+            <div class="linha"><span>Pedicure completo</span><span class="preco">9.000 Kz</span></div>
+          </div>
+        </div>
+
+        <div class="grupo" id="rosto">
+          <h3>Sobrancelhas e pestanas</h3>
+          <div class="lista">
+            <div class="linha"><span>Sobrancelhas</span><span class="preco">1.500 Kz</span></div>
+            <div class="linha"><span>Aplicação de pestanas</span><span class="preco">2.500 Kz</span></div>
+            <div class="linha"><span>Henna</span><span class="preco">3.000 Kz</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="trabalhos" style="background:#fff">
+  <div class="wrap">
+    <h2>Os nossos trabalhos</h2>
+    <p class="sub">Feitos no nosso salão. Mais no Instagram <a href="https://www.instagram.com/marynasc_salao_de_beleza_">@marynasc_salao_de_beleza_</a> e no TikTok <a href="https://www.tiktok.com/@salao.marinasc">@salao.marinasc</a>.</p>
+    <div class="galeria">
+      <figure><video src="media/trabalho1.mp4" poster="media/trabalho1.jpg" muted loop playsinline preload="none"></video><figcaption>Bobes com cachos · 16.500 Kz</figcaption></figure>
+      <figure><video src="media/trabalho2.mp4" poster="media/trabalho2.jpg" muted loop playsinline preload="none"></video><figcaption>Cordoletes com cachos · 17.500 Kz</figcaption></figure>
+      <figure><video src="media/trabalho3.mp4" poster="media/trabalho3.jpg" muted loop playsinline preload="none"></video><figcaption>Aplicação de cabelo · 10.000 Kz</figcaption></figure>
+      <figure><video src="media/trabalho4.mp4" poster="media/trabalho4.jpg" muted loop playsinline preload="none"></video><figcaption>Bobes com cachos · 16.500 Kz</figcaption></figure>
+      <figure><video src="media/trabalho5.mp4" poster="media/trabalho5.jpg" muted loop playsinline preload="none"></video><figcaption>Twists</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<!-- AVALIAÇÕES: descomentar quando houver textos reais do Google
+<section id="avaliacoes">
+  <div class="wrap">
+    <h2>O que dizem as clientes</h2>
+    <p class="sub">Avaliações do Google.</p>
+    <!-- EDITAR: copiar avaliações verdadeiras do Perfil Google --&gt;
+    <div class="avaliacoes">
+      <div class="avaliacao"><div class="estrelas">★★★★★</div><p>[Texto de uma avaliação real do Google]</p><span>[Nome da cliente]</span></div>
+      <div class="avaliacao"><div class="estrelas">★★★★★</div><p>[Texto de uma avaliação real do Google]</p><span>[Nome da cliente]</span></div>
+    </div>
+  </div>
+</section>
+-->
+
+<section class="visita" id="visita">
+  <div class="wrap">
+    <div>
+      <h2>Visite-nos</h2>
+      <p class="sub">No coração do Kilamba.</p>
+      <dl>
+        <dt>Morada</dt><dd>Edifício C19, Apt. 41, Centralidade do Kilamba, Luanda</dd>
+        <dt>Horário</dt><dd>Segunda a sexta, 08:00 às 21:00<br>Sábado e domingo, 09:00 às 20:00</dd>
+        <dt>WhatsApp</dt><dd><a href="https://wa.me/244946397096">946 397 096</a></dd>
+        <dt>Telefone</dt><dd><a href="tel:+244921610705">921 610 705</a></dd>
+      </dl>
+    </div>
+    <iframe class="mapa" loading="lazy" title="Mapa do salão MariNasc" src="https://www.google.com/maps?q=MARINASC+Bloco+C19+Centralidade+do+Kilamba+Luanda&output=embed"></iframe>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="wrap">
+    <h2>Pronta para ficar ainda mais bonita?</h2>
+    <p>Diga-nos o serviço, o dia e a hora. Confirmamos pelo WhatsApp.</p>
+    <a class="btn" href="https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20fazer%20uma%20marca%C3%A7%C3%A3o."><svg><use href="#wa"/></svg>Marcar agora</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>© 2026 MariNasc Salão de Beleza · MARINASC - Comércio e Prestação de Serviços, Lda · NIF 5000559687</span>
+    <span><a href="https://www.instagram.com/marynasc_salao_de_beleza_">Instagram</a> · <a href="https://www.tiktok.com/@salao.marinasc">TikTok</a></span>
+  </div>
+</footer>
+
+<a class="flutuante" aria-label="Marcar pelo WhatsApp" href="https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20fazer%20uma%20marca%C3%A7%C3%A3o."><svg><use href="#wa"/></svg></a>
+
+<script>
+  // Na galeria, cada vídeo só toca quando aparece no ecrã (poupa dados móveis)
+  const vids = document.querySelectorAll('.galeria video');
+  const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting ? e.target.play().catch(() => {}) : e.target.pause()), { threshold: .4 });
+  vids.forEach(v => io.observe(v));
+</script>
+</body>
+</html>
