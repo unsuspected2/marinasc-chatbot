@@ -48,7 +48,7 @@ Preenche no `.env`:
 - `VERIFY_TOKEN` = uma palavra secreta inventada por ti (ex.: marinasc-2026-xyz)
 - `OPENAI_API_KEY` = a tua chave da OpenAI (opcional; sem ela o bot responde só com o FAQ)
 
-Testa: `npm run simular` e depois `npm start`. Em http://localhost:3000/health deve aparecer `"status":"ok"`.
+Testa: `npm run simular` e depois `npm start`. Em http://localhost:3100/health deve aparecer `"status":"ok"`.
 
 ## 6. Pôr o bot acessível na internet (Cloudflare Tunnel, como no ClipForge)
 
@@ -56,13 +56,13 @@ A Meta precisa de um endereço HTTPS público.
 
 - **Teste rápido** (o endereço muda sempre que reinicias):
   ```bash
-  cloudflared tunnel --url http://localhost:3000
+  cloudflared tunnel --url http://localhost:3100
   ```
   Usa o endereço `https://….trycloudflare.com` que aparecer.
-- **Definitivo:** no painel Cloudflare Zero Trust, no túnel que já usas para o ClipForge, acrescenta
-  um *Public hostname* (ex.: `bot.<o-teu-domínio>`) a apontar para `http://localhost:3000`.
+- **Definitivo:** túnel com nome no teu domínio, como serviço que arranca com o PC. Passo a passo em
+  [ARRANQUE-AUTOMATICO.md](ARRANQUE-AUTOMATICO.md#2-túnel-com-nome-no-teu-domínio).
 
-O bot só responde enquanto o PC e o túnel estiverem ligados.
+O bot usa a porta 3100 (a 3000 é do ClipForge) e só responde enquanto o PC e o túnel estiverem ligados.
 
 ## 7. Registar o webhook na Meta
 

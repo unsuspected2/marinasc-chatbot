@@ -1,0 +1,115 @@
+# Guia do bot MARINASC
+
+Guia para o dia a dia: mudar preços, promoções e horário, e o que fazer se o bot parar.
+Os ficheiros abrem-se no VS Code. Depois de mudar um ficheiro em `src/`, reinicia o bot:
+
+```bash
+systemctl --user restart marinasc-bot
+```
+
+Para confirmar que não estragaste nada antes de reiniciar: `npm run simular` (mostra conversas de
+exemplo no terminal, sem enviar nada a ninguém).
+
+---
+
+## Mudar preços
+
+Ficheiro: **`src/data/faq.json`**
+
+1. As listas completas estão nas entradas que começam por `menu_`:
+   `menu_trancas`, `menu_unhas`, `menu_rosto` (sobrancelhas, pestanas, henna), `menu_cabelo`.
+   São estas listas que o bot mostra nas opções do menu e que a IA usa para responder.
+2. Há também respostas curtas para um serviço só (ex.: `"cordoletes": "💖 *Cordoletes*: 15.000 Kz…"`).
+   Usa **Ctrl+F** no VS Code com o nome do serviço para encontrares todas e muda o preço em cada uma.
+3. Respostas que começam por `@` (ex.: `"domingo": "@menu_horario"`) não têm texto próprio: usam o
+   texto da entrada indicada. Não precisas de mexer nelas.
+4. Cuidado com as aspas e vírgulas: cada linha é `"chave": "texto",` e `\n` é uma mudança de linha.
+   Se o bot não arrancar depois de mudares, o erro está quase sempre aí (o `npm run simular` mostra-o).
+5. Actualiza também o site, em `site/index.html`, e publica-o com `npm run deploy`.
+
+Serviço novo: acrescenta a linha `• Nome: preço` na lista `menu_…` certa. O bot passa a reconhecê-lo
+nas marcações automaticamente.
+
+## Promoções
+
+Pelo WhatsApp do salão (946 397 096), envia ao bot (955 705 188):
+
+| Mensagem | O que faz |
+|---|---|
+| `/promo 10% de desconto nas tranças até sexta` | passa a ser a promoção activa |
+| `/promo` | mostra a promoção actual |
+| `/promo off` | desliga as promoções |
+
+Ou edita **`data/promocoes.json`** (não precisa de reiniciar): `"activa": true` liga, `"ate": "2026-12-31"`
+é o último dia (no dia seguinte desaparece sozinha).
+
+O bot mostra a promoção no menu, responde a quem perguntar por promoções e a IA pode mencioná-la.
+
+## Horário
+
+Ficheiro: **`src/data/horario.json`**: é este que decide "Bom dia… estamos abertos até às 21h" e que
+valida a hora das marcações.
+
+- Cada dia tem `["abre", "fecha"]` no formato `"08:00"`. Dia fechado: `null` (ex.: `"domingo": null`).
+- Feriados ou dias fechados: acrescenta a data em `"fechado_em"`, no formato `"2026-12-25"`.
+
+Se o horário mudar de vez, actualiza também:
+- o texto da entrada `menu_horario` em `src/data/faq.json`;
+- o site (`site/index.html`, procura "Horário") e `npm run deploy`.
+
+## Comandos da equipa
+
+Só funcionam a partir do 946 397 096 (ou dos números em `ADMIN_NUMBERS` no `.env`), escritos para o bot:
+
+| Comando | Para quê |
+|---|---|
+| `/stats` | conversas e pré-marcações de hoje e dos últimos 7 dias, serviços mais pedidos |
+| `/promo …` | promoções (ver acima) |
+| `/pausa` | o bot deixa de atender: cada cliente recebe uma vez o link do 946 |
+| `/retomar` | o bot volta a atender |
+| `/admin` | lista estes comandos |
+
+As pré-marcações ficam em `data/marcacoes.json` (nome, serviço, dia, hora e número do cliente).
+**A vaga só fica marcada quando a equipa confirma no 946**: o bot nunca confirma sozinho.
+
+---
+
+## O bot parou de responder: o que fazer
+
+Vai por esta ordem:
+
+1. **O PC está ligado e com sessão iniciada?** O bot corre neste PC.
+2. **O bot está a correr?**
+   ```bash
+   systemctl --user status marinasc-bot
+   ```
+   Se não disser `active (running)`: `systemctl --user restart marinasc-bot`.
+3. **O que diz o registo?**
+   ```bash
+   tail -n 50 /run/media/josaid/4A2EE4DC2EE4C255/main_web/marinasc-chatbot/logs/bot.log
+   ```
+   - `Status: 401` ou `Invalid OAuth access token` → o token da Meta deixou de valer. Gera um novo
+     (Utilizadores do sistema, ver `docs/LIGAR-WHATSAPP.md`, passo 4), põe-no no `.env` e reinicia.
+   - `You have no credits remaining` → a conta OpenAI ficou sem saldo. O bot continua a responder com as
+     respostas prontas; para voltar a conversa natural e os áudios, carrega créditos em
+     https://platform.openai.com/settings/organization/billing/
+   - `ETIMEDOUT` / `ENETUNREACH` → sem internet no PC.
+   - Não aparece nada quando mandas uma mensagem → o problema está antes do bot (passo 4).
+4. **O túnel está ligado?** Abre no browser o endereço do bot com `/health` no fim
+   (ex.: `https://bot.o-teu-dominio.com/health`). Deve aparecer `"status":"ok"`.
+   - Com o túnel com nome: `systemctl --user restart marinasc-tunnel`.
+   - Com o túnel rápido (`trycloudflare.com`): se o terminal fechou, o endereço mudou. Corre de novo
+     `cloudflared tunnel --url http://localhost:3100` e põe o novo endereço na Meta (Configuração →
+     Webhook → Callback URL, terminado em `/webhook`).
+5. **A app da Meta está "Ao vivo"?** Em developers.facebook.com → a app → interruptor no topo. Em
+   "Desenvolvimento" a Meta não entrega mensagens de clientes.
+6. **O bot foi posto em pausa?** Manda `/stats` do 946: se disser "em pausa", manda `/retomar`.
+
+Enquanto o bot estiver parado, os clientes podem sempre falar com a equipa no 946 397 096.
+
+---
+
+## Mais documentação
+
+- `docs/LIGAR-WHATSAPP.md`: ligação à Meta (número, token, webhook).
+- `docs/ARRANQUE-AUTOMATICO.md`: serviços que arrancam com o PC e túnel com nome.

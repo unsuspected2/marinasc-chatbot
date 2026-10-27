@@ -7,6 +7,10 @@
 //  2. Correspondência parcial (chave contida na mensagem)
 //  3. Correspondência por sinônimos embutida nas chaves do JSON
 //  4. Erros de escrita: palavra a 1 letra da chave (2 nas palavras longas)
+//
+// Uma resposta "@outra_chave" usa o texto dessa chave (ex.: todas as
+// perguntas de horário apontam para "@menu_horario"), para cada texto
+// estar escrito num só sítio.
 // ============================================================
 
 const path = require("path");
@@ -41,6 +45,11 @@ function normalize(text) {
 // Retorna: string com a resposta | null se não encontrado
 // -------------------------------------------------------
 function findAnswer(message) {
+  const answer = findRawAnswer(message);
+  return answer && answer.startsWith("@") ? faqData[answer.slice(1)] || null : answer;
+}
+
+function findRawAnswer(message) {
   if (!message || typeof message !== "string") return null;
 
   const normalizedMessage = normalize(message);

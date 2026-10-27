@@ -1,0 +1,18 @@
+# Túnel Cloudflare com nome (ex.: bot.o-teu-dominio) para o bot MARINASC.
+# Precisa do token do túnel em ~/.config/marinasc/tunnel-token (nunca no git).
+# Instalação: ver docs/ARRANQUE-AUTOMATICO.md
+[Unit]
+Description=Túnel Cloudflare do bot MARINASC
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=%h/.config/marinasc/tunnel-token
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=/home/josaid/.local/bin/cloudflared tunnel --no-autoupdate run --token-file %h/.config/marinasc/tunnel-token
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
