@@ -1,7 +1,8 @@
 # Guia do bot MARINASC
 
 Guia para o dia a dia: mudar preços, promoções e horário, e o que fazer se o bot parar.
-O bot corre na Cloudflare ([CLOUDFLARE.md](CLOUDFLARE.md)), não neste PC. Os ficheiros abrem-se no
+O bot corre na Cloudflare ([CLOUDFLARE.md](CLOUDFLARE.md)), não neste PC. Para usar o bot no dia a dia (comandos, marcações), ver [COMO-USAR.md](COMO-USAR.md).
+Os ficheiros abrem-se no
 VS Code; depois de mudar um ficheiro em `src/` ou `site/`, publica a alteração:
 
 ```bash
@@ -56,21 +57,26 @@ Se o horário mudar de vez, actualiza também:
 - o texto da entrada `menu_horario` em `src/data/faq.json`;
 - o site (`site/index.html`, procura "Horário") e `npm run deploy`.
 
+## Agenda: durações e profissionais
+
+Ficheiro: **`src/data/agenda.json`**. É este que decide quando uma hora está cheia.
+
+- `areas` → cada área (barbearia, tranças, unhas, rosto, cabelo, spa) tem:
+  - `profissionais`: quantas clientes atende ao mesmo tempo;
+  - `duracao_min`: duração normal de um serviço dessa área, em minutos;
+  - `palavras`: palavras que põem um serviço nessa área (sem acentos);
+  - `horario` (só a barbearia): horário próprio, em vez do do salão.
+- `duracoes` → duração de serviços que fogem à regra da área (ex.: `"Micro twists": 360`).
+- `intervalo_min` → de quanto em quanto tempo o bot oferece horas (30 = 9h, 9h30, 10h…).
+- `antecedencia_min` → com quanta antecedência se pode marcar para hoje (60 = só daqui a 1 hora).
+
+Os valores que lá estão são estimativas: **corrija-os com a realidade do salão** e publique com
+`npm run deploy`.
+
 ## Comandos da equipa
 
-Só funcionam a partir do 946 397 096 (ou dos números em `ADMIN_NUMBERS` no `.env`), escritos para o bot:
-
-| Comando | Para quê |
-|---|---|
-| `/stats` | conversas e pré-marcações de hoje e dos últimos 7 dias, serviços mais pedidos |
-| `/marcacoes` | as últimas 10 pré-marcações, com o link para o WhatsApp de cada cliente |
-| `/promo …` | promoções (ver acima) |
-| `/pausa` | o bot deixa de atender: cada cliente recebe uma vez o link do 946 |
-| `/retomar` | o bot volta a atender |
-| `/admin` | lista estes comandos |
-
-As pré-marcações (nome, serviço, dia, hora e número do cliente) vêem-se com `/marcacoes`.
-**A vaga só fica marcada quando a equipa confirma no 946**: o bot nunca confirma sozinho.
+Todos os comandos (agenda, confirmar, recusar, ocupar, bloquear, promoções, pausa) estão explicados em
+**[COMO-USAR.md](COMO-USAR.md#2-o-que-a-equipa-faz-a-partir-do-946-397-096)**.
 
 ---
 
@@ -112,5 +118,6 @@ Enquanto o bot estiver parado, os clientes podem sempre falar com a equipa no 94
 ## Mais documentação
 
 - `docs/LIGAR-WHATSAPP.md`: ligação à Meta (número, token, webhook).
+- `docs/COMO-USAR.md`: o que o bot faz e os comandos da equipa.
 - `docs/CLOUDFLARE.md`: onde o bot corre, segredos, publicar, logs.
 - `docs/ARRANQUE-AUTOMATICO.md`: (opcional) correr o bot no PC em vez da Cloudflare.

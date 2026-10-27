@@ -200,7 +200,7 @@ function start(from, text = "") {
   const hora = parseTime(text);
   // Só fica com a hora se estiver livre; senão o passo "hora" mostra as livres
   if (f.servico && f.dia && hora?.minutos !== undefined && !agenda.whyNot(f.dia.data, hora.minutos, f.servico)) f.hora = hora;
-  if (f.dia && (!agenda.openingHours(f.dia.data) || (f.servico && !agenda.freeSlots(f.dia.data, f.servico).length))) {
+  if (f.dia && (!agenda.openingHours(f.dia.data, f.servico) || (f.servico && !agenda.freeSlots(f.dia.data, f.servico).length))) {
     f.semVaga = f.dia.label; // o passo "dia" explica porquê
     f.dia = null;
   }
@@ -271,7 +271,7 @@ function noSlotsReply(f, dia) {
     next.push(n.dia);
     from = agenda.addDays(n.dia, 1);
   }
-  const why = agenda.openingHours(dia.data) ? `já não há vagas para ${f.servico}` : "o salão está fechado";
+  const why = agenda.openingHours(dia.data, f.servico) ? `já não há vagas para ${f.servico}` : "o salão está fechado";
   return {
     reply: {
       text: `Nesse dia (${dia.label}) ${why} 😕 ${next.length ? "Tenho vaga nestes dias:" : "Escolha outro dia, por favor."}`,
@@ -378,7 +378,7 @@ function answer(from, text, { interactiveId, profileName } = {}) {
 
 // A hora pedida não dá: explica porquê e mostra as livres mais perto
 function busyReply(f, minutos, why) {
-  const hours = agenda.openingHours(f.dia.data);
+  const hours = agenda.openingHours(f.dia.data, f.servico);
   const buttons = nearestButtons(f, minutos);
   const pedido = minutos ? `Às ${agenda.horaLabel(minutos)}` : "Essa hora";
   const text = {

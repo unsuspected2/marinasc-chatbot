@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>MARINASC | Salão de Beleza no Kilamba</title>
-<meta name="description" content="Salão de beleza MARINASC na Centralidade do Kilamba, C19. Tranças, twists, aplicação de cabelo, unhas de gel e porcelana, sobrancelhas e pestanas. Marcações pelo WhatsApp 946 397 096.">
+<meta name="description" content="Salão de beleza MARINASC na Centralidade do Kilamba, C19. Tranças, twists, aplicação de cabelo, unhas de gel e porcelana, sobrancelhas, spa, depilação e barbearia. Marcações pelo WhatsApp 946 397 096.">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="MARINASC Salão de Beleza">
 <meta property="og:title" content="MARINASC | Salão de Beleza no Kilamba">
@@ -68,6 +68,8 @@
   .linha:last-child { border-bottom: 0; }
   .linha .preco { font-weight: 600; color: var(--azul); white-space: nowrap; }
   .linha small { display: block; color: var(--suave); font-size: .82rem; }
+  .sub-lista { padding: 10px 18px 6px; background: #fbf5f8; font-size: .8rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--suave); border-bottom: 1px solid #f3eaef; }
+  .nota { margin-top: 8px; font-size: .85rem; color: var(--suave); }
   .nota { color: var(--suave); font-size: .9rem; margin-top: 8px; }
 
   .galeria { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
@@ -102,7 +104,7 @@
   @media (min-width: 760px) {
     .hero .wrap { grid-template-columns: 1.2fr .8fr; }
     .avaliacoes { grid-template-columns: repeat(2, 1fr); }
-    .galeria { grid-template-columns: repeat(5, 1fr); }
+    .galeria { grid-template-columns: repeat(4, 1fr); }
     .visita .wrap { grid-template-columns: 1fr 1fr; align-items: center; }
     .grupos { display: grid; grid-template-columns: 1fr 1fr; gap: 0 28px; }
   }
@@ -124,7 +126,7 @@
     <div>
       <div class="lema">Beleza · Cuidado · Confiança</div>
       <h1>Salão de beleza <em>no Kilamba</em></h1>
-      <p>Tranças, twists, aplicação de cabelo, unhas, sobrancelhas e pestanas. Cabeleireiro, Manicure e Spa num só lugar.</p>
+      <p>Tranças, twists, aplicação de cabelo, unhas, sobrancelhas, spa, estética e barbearia. Cabeleireiro, Manicure, Spa e Barbearia num só lugar.</p>
       <a class="btn" href="https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20fazer%20uma%20marca%C3%A7%C3%A3o."><svg><use href="#wa"/></svg>Marcar pelo WhatsApp</a>
       <div class="info-rapida">
         <span>📍 Centralidade do Kilamba, C19, Apt. 41</span>
@@ -139,7 +141,7 @@
   <div class="wrap">
     <h2>Serviços e preços</h2>
     <p class="sub">Tabela de valores actualizada. Os preços podem variar com o comprimento e o volume.</p>
-    <nav class="tabs"><a href="#trancas">Tranças e twists</a><a href="#cabelo">Cabelo</a><a href="#unhas">Unhas</a><a href="#rosto">Sobrancelhas e pestanas</a></nav>
+    <nav class="tabs"><a href="#trancas">Tranças e twists</a><a href="#unhas">Unhas</a><a href="#rosto">Sobrancelhas e pestanas</a><a href="#cabelo">Cabelo</a><a href="#spa">Spa e estética</a><a href="#barbearia">Barbearia</a></nav>
 
     <div class="grupos">
       <div class="grupo" id="trancas">
@@ -164,15 +166,6 @@
       </div>
 
       <div>
-        <div class="grupo" id="cabelo">
-          <h3>Cabelo</h3>
-          <div class="lista">
-            <div class="linha"><span>Aplicação de cabelo</span><span class="preco">10.000 Kz</span></div>
-            <!-- EDITAR: acrescentar lavagem, escova, tratamentos, penteados, etc. quando houver preços -->
-            <div class="linha"><span>Lavagem, tratamentos, escova e penteados</span><span class="preco">Pergunte-nos</span></div>
-          </div>
-        </div>
-
         <div class="grupo" id="unhas">
           <h3>Unhas</h3>
           <div class="lista">
@@ -198,6 +191,87 @@
         </div>
       </div>
     </div>
+
+    <div class="grupos">
+      <div class="grupo" id="cabelo">
+        <h3>Cabelo</h3>
+        <div class="lista">
+            <div class="sub-lista">Aplicação de costura</div>
+            <div class="linha"><span>Aplicação de cabelo (cabelo da cliente)</span><span class="preco">10.000 Kz</span></div>
+            <div class="linha"><span>Cabelo orgânico (nosso material)</span><span class="preco">12.000 Kz</span></div>
+            <div class="linha"><span>Aplicação de cabelo sul-africano</span><span class="preco">15.000 Kz</span></div>
+            <div class="linha"><span>Aplicação chocolate (nosso material)</span><span class="preco">15.000 Kz</span></div>
+            <div class="linha"><span>Aplicação fio a fio</span><span class="preco">15.000 Kz</span></div>
+            <div class="linha"><span>Personalização completa</span><span class="preco">14.000 Kz</span></div>
+            <div class="linha"><span>Simulação</span><span class="preco">8.000 Kz</span></div>
+            <div class="linha"><span>Aplicação de queratina</span><span class="preco">45.000 Kz</span></div>
+            <div class="sub-lista">Desfriso com produto de caixa</div>
+            <div class="linha"><span>Desfriso de caixa, cabelo comprido</span><span class="preco">18.000 Kz</span></div>
+            <div class="linha"><span>Desfriso de caixa, cabelo médio</span><span class="preco">16.000 Kz</span></div>
+            <div class="linha"><span>Desfriso de caixa, cabelo curto</span><span class="preco">14.000 Kz</span></div>
+            <div class="sub-lista">Desfriso com produto de boião</div>
+            <div class="linha"><span>Desfriso de boião, cabelo comprido</span><span class="preco">13.000 Kz</span></div>
+            <div class="linha"><span>Desfriso de boião, curto e médio</span><span class="preco">10.000 Kz</span></div>
+            <div class="linha"><span>Desfriso intercalar</span><span class="preco">4.000 Kz</span></div>
+            <div class="sub-lista">Mise</div>
+            <div class="linha"><span>Lavagem com brushing (cabelo natural)</span><span class="preco">7.000 Kz</span></div>
+            <div class="linha"><span>Brushing</span><span class="preco">3.000 Kz</span></div>
+            <div class="linha"><span>Mise com rolos</span><span class="preco">5.000 Kz</span></div>
+            <div class="linha"><span>Bigodinho</span><span class="preco">8.000 Kz</span></div>
+            <div class="sub-lista">Pintura</div>
+            <div class="linha"><span>Descolorar as pontas (cabelo natural)</span><span class="preco">6.000 Kz</span></div>
+            <div class="linha"><span>Nuances</span><span class="preco">6.000 Kz</span></div>
+            <div class="linha"><span>Pintura preto (cabelo natural)</span><span class="preco">4.000 Kz</span></div>
+            <div class="linha"><span>Pintura no cabelo humano</span><span class="preco">8.000 Kz</span></div>
+            <div class="linha"><span>Pintura de caixa</span><span class="preco">6.000 Kz</span></div>
+            <div class="linha"><span>Corte feminino, tratamentos, penteados e perucas</span><span class="preco">Pergunte-nos</span></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="grupo" id="spa">
+          <h3>Spa e estética</h3>
+          <div class="lista">
+            <div class="sub-lista">Para mulheres</div>
+            <div class="linha"><span>Massagem relaxante</span><span class="preco">15.000 Kz</span></div>
+            <div class="linha"><span>Massagem de toalhas quentes</span><span class="preco">20.000 Kz</span></div>
+            <div class="linha"><span>Massagem modeladora</span><span class="preco">19.000 Kz</span></div>
+            <div class="linha"><span>Limpeza facial</span><span class="preco">20.000 Kz</span></div>
+            <div class="linha"><span>Limpeza facial com massagem</span><span class="preco">25.000 Kz</span></div>
+            <div class="linha"><span>Depilação virilha completa</span><span class="preco">10.000 Kz</span></div>
+            <div class="linha"><span>Depilação meia virilha</span><span class="preco">8.000 Kz</span></div>
+            <div class="linha"><span>Depilação perna completa</span><span class="preco">12.000 Kz</span></div>
+            <div class="linha"><span>Depilação meia perna</span><span class="preco">6.000 Kz</span></div>
+            <div class="linha"><span>Depilação braço completo</span><span class="preco">7.000 Kz</span></div>
+            <div class="linha"><span>Depilação axila</span><span class="preco">6.000 Kz</span></div>
+            <div class="linha"><span>Depilação buço</span><span class="preco">2.000 Kz</span></div>
+            <div class="sub-lista">Para homens</div>
+            <div class="linha"><span>Depilação peito completo</span><span class="preco">18.000 Kz</span></div>
+            <div class="linha"><span>Depilação meio peito</span><span class="preco">10.000 Kz</span></div>
+            <div class="linha"><span>Depilação braço completo (homem)</span><span class="preco">12.000 Kz</span></div>
+            <div class="linha"><span>Depilação axilas (homem)</span><span class="preco">7.000 Kz</span></div>
+            <div class="linha"><span>Depilação perna (homem)</span><span class="preco">15.000 Kz</span></div>
+            <div class="linha"><span>Massagem relaxante para homem</span><span class="preco">20.000 Kz</span></div>
+            <div class="linha"><span>Massagem para homem com toalhas quentes</span><span class="preco">22.000 Kz</span></div>
+          </div>
+        </div>
+
+        <div class="grupo" id="barbearia">
+          <h3>Barbearia</h3>
+          <div class="lista">
+            <div class="linha"><span>Corte masculino</span><span class="preco">1.500 Kz</span></div>
+            <div class="linha"><span>Degradê</span><span class="preco">1.000 Kz</span></div>
+            <div class="linha"><span>Barba</span><span class="preco">1.000 Kz</span></div>
+            <div class="linha"><span>Sobrancelha (barbearia)</span><span class="preco">1.000 Kz</span></div>
+            <div class="linha"><span>Corte + barba</span><span class="preco">2.000 Kz</span></div>
+            <div class="linha"><span>Lavagem + hidratação (barbearia)</span><span class="preco">2.000 Kz</span></div>
+            <div class="linha"><span>Corte infantil</span><span class="preco">1.000 Kz</span></div>
+            <div class="linha"><span>Desenho no cabelo</span><span class="preco">1.000 Kz</span></div>
+          </div>
+          <p class="nota">Segunda a sexta 8h30–19h30 · Sábado 8h30–17h30 · Domingo fechado</p>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -211,6 +285,8 @@
       <figure><video src="media/trabalho3.mp4" poster="media/trabalho3.jpg" muted loop playsinline preload="none"></video><figcaption>Aplicação de cabelo · 10.000 Kz</figcaption></figure>
       <figure><video src="media/trabalho4.mp4" poster="media/trabalho4.jpg" muted loop playsinline preload="none"></video><figcaption>Bobes com cachos · 16.500 Kz</figcaption></figure>
       <figure><video src="media/trabalho5.mp4" poster="media/trabalho5.jpg" muted loop playsinline preload="none"></video><figcaption>Twists</figcaption></figure>
+      <figure><video src="media/trabalho6.mp4" poster="media/trabalho6.jpg" muted loop playsinline preload="none"></video><figcaption>Spa e estética · tratamento facial</figcaption></figure>
+      <figure><video src="media/trabalho7.mp4" poster="media/trabalho7.jpg" muted loop playsinline preload="none"></video><figcaption>O nosso salão no Kilamba</figcaption></figure>
     </div>
   </div>
 </section>

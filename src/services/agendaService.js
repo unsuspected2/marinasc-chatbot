@@ -22,7 +22,7 @@ const ACTIVE = ["pendente", "confirmada"];
 const STEP = agenda.intervalo_min || 30;
 
 const toMin = hhmm => hhmm.split(":").map(Number).reduce((h, m) => h * 60 + m);
-const normalize = text => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
+const normalize = text => text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9+-]+/g, " ").trim();
 
 // "às 9h", "às 14h30"
 function horaLabel(min) {
@@ -55,13 +55,15 @@ function capacity(area) {
 }
 
 // -------------------------------------------------------
-// Horário do salão nesse dia: ["08:00", "21:00"] ou null (fechado)
+// Horário nesse dia: ["08:00", "21:00"] ou null (fechado).
+// Com serviço, usa o horário da área se ela tiver um (barbearia).
 // -------------------------------------------------------
-function openingHours(iso) {
+function openingHours(iso, servico) {
   const h = require("../data/horario.json");
   if ((h.fechado_em || []).includes(iso)) return null;
   const key = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][new Date(`${iso}T12:00:00Z`).getUTCDay()];
-  return h.dias[key] || null;
+  const own = servico && agenda.areas[areaFor(servico)]?.horario;
+  return (own ? own[key] : h.dias[key]) || null;
 }
 
 // -------------------------------------------------------
@@ -106,7 +108,7 @@ function upcomingOf(cliente) {
 
 // Porque é que essa hora não serve (null = está livre)
 function whyNot(iso, inicio, servico, { ignore } = {}) {
-  const hours = openingHours(iso);
+  const hours = openingHours(iso, servico);
   if (!hours) return "fechado";
   const dur = durationFor(servico);
   if (inicio < toMin(hours[0]) || inicio + dur > toMin(hours[1])) return "fora_do_horario";
@@ -132,7 +134,7 @@ function whyNot(iso, inicio, servico, { ignore } = {}) {
 
 // Horas livres de um dia para um serviço (minutos desde a meia-noite)
 function freeSlots(iso, servico, { from = 0, to = 24 * 60 } = {}) {
-  const hours = openingHours(iso);
+  const hours = openingHours(iso, servico);
   if (!hours) return [];
   const slots = [];
   for (let m = Math.max(toMin(hours[0]), from); m < Math.min(toMin(hours[1]), to); m += STEP) {

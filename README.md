@@ -6,13 +6,15 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
 - **Chatbot** (`src/`): WhatsApp Cloud API (Meta), a correr no Cloudflare Workers (sempre ligado,
   sem depender do PC; ver [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md)). Também corre no PC com Node.js. Menu com lista e botões
   interactivos, conversa natural com IA gratuita no Groq (gpt-oss-120b; só com a informação do salão, nunca inventa preços),
-  áudios transcritos com o Whisper, pré-marcações guiadas que seguem para a equipa no 946 397 096,
+  áudios transcritos com o Whisper, marcações com agenda (só oferece horas livres, evita sobreposições,
+  confirmar/recusar/remarcar/cancelar) que seguem para a equipa no 946 397 096,
   promoções e comandos da equipa (`/stats`, `/promo`, `/pausa`, `/retomar`). Sem IA, responde com
   `src/data/faq.json`.
 - **Site** (`site/`): página estática com serviços e preços, galeria de trabalhos, horário, mapa e
   botão "Marcar pelo WhatsApp" (946 397 096). Publicada no mesmo Worker do bot:
   https://marinasc.marinasc-chatbot.workers.dev/
 
+**Como usar (marcações, comandos da equipa): [docs/COMO-USAR.md](docs/COMO-USAR.md).**
 **Uso diário (preços, promoções, horário, o que fazer se o bot parar): [docs/GUIA.md](docs/GUIA.md).**
 
 ## Estrutura
@@ -28,12 +30,14 @@ src/
 │   ├── whatsappService.js     ← envio pela Graph API (texto, botões, listas, media)
 │   ├── aiService.js           ← IA: Groq ou OpenAI (persona, memória de 24 h) e Whisper
 │   ├── faqService.js          ← respostas prontas, tolerantes a erros de escrita
-│   ├── bookingService.js      ← pré-marcação: serviço, dia, hora, nome → link do 946
+│   ├── bookingService.js      ← pré-marcação: serviço, dia, hora, nome
+│   ├── agendaService.js       ← agenda: vagas, durações, profissionais, bloqueios
 │   ├── promoService.js        ← promoções activas
 │   ├── statsService.js        ← conversas por dia e resumo para /stats
 │   └── adminService.js        ← comandos da equipa e pausa
 ├── data/faq.json              ← preços, morada, respostas (editar aqui)
 ├── data/horario.json          ← horário de abertura e feriados
+├── data/agenda.json           ← duração dos serviços e profissionais por área
 └── utils/                     ← logger, horário de Luanda, dados (Cloudflare ou data/)
 data/promocoes.json            ← promoções de exemplo (no dia a dia: /promo no WhatsApp)
 data/*.json                    ← dados do bot quando corre no PC, fora do git

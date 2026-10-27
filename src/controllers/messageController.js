@@ -8,7 +8,7 @@
 //  3. Áudio → transcrição; foto/vídeo/documento → encaminha para a equipa
 //  4. Comandos da equipa (/stats, /promo, /pausa…) e bot em pausa
 //  5. Pré-marcação (serviço → dia → hora → nome → link para a equipa)
-//  6. Botões e listas interactivas, números do menu (1 a 7), comandos
+//  6. Botões e listas interactivas, números do menu (1 a 9), comandos
 //  7. Cumprimento simples → menu com saudação pela hora de Luanda
 //  8. Conversa livre: OpenAI, com o histórico da conversa
 //  9. Sem IA: keywords de fluxos especiais e FAQ
@@ -73,7 +73,8 @@ const GREETING_FILLER = ["tudo bem", "td bem", "tudo bom", "como esta", "como es
 
 // -------------------------------------------------------
 // Opções do menu principal (lista interactiva e menu em texto)
-// O número de cada opção continua a funcionar escrito ("1" a "7").
+// O número de cada opção continua a funcionar escrito ("1" a "9").
+// As novas vão para o fim, para os números antigos não mudarem.
 // -------------------------------------------------------
 const MENU_OPTIONS = {
   pt: [
@@ -84,6 +85,8 @@ const MENU_OPTIONS = {
     { title: "Horário e localização", description: "Kilamba, Edifício C19", text: "📍 Horário e localização" },
     { title: "Fazer uma marcação", description: "Preparamos o pedido para a equipa", text: "📅 Fazer uma marcação" },
     { title: "Falar com a equipa", description: "WhatsApp do salão 946 397 096", text: "👤 Falar com a nossa equipa" },
+    { title: "Spa e estética", description: "Massagens, limpeza facial, depilação", text: "🌸 Spa e estética (preços)" },
+    { title: "Barbearia", description: "Corte, degradê, barba", text: "💈 Barbearia (preços)" },
   ],
   en: [
     { title: "Braids and twists", description: "Prices", text: "💇🏾‍♀️ Braids and twists (prices)" },
@@ -93,11 +96,15 @@ const MENU_OPTIONS = {
     { title: "Hours and location", description: "Kilamba, Building C19", text: "📍 Opening hours and location" },
     { title: "Book an appointment", description: "We prepare the request for the team", text: "📅 Book an appointment" },
     { title: "Talk to our team", description: "Salon WhatsApp +244 946 397 096", text: "👤 Talk to our team" },
+    { title: "Spa and beauty", description: "Massages, facials, waxing", text: "🌸 Spa and beauty (prices)" },
+    { title: "Barber shop", description: "Cuts, fades, beard", text: "💈 Barber shop (prices)" },
   ],
 };
 
 // Opção do menu → chave do FAQ (null = falar com a equipa)
-const MENU_FAQ_KEYS = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null];
+const MENU_FAQ_KEYS = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null, "menu_spa", "menu_barbearia"];
+// Ordem em que aparecem: preços primeiro, depois o salão
+const MENU_ORDER = [0, 1, 2, 3, 7, 8, 4, 5, 6];
 
 // Botões que seguem as respostas de preços: o próximo passo
 const NEXT_STEP_BUTTONS = {
@@ -220,7 +227,7 @@ async function sendMenu(to, lang, name) {
 
   const options = MENU_OPTIONS[lang] || MENU_OPTIONS.pt;
   const rows = options.map((o, i) => ({ id: `menu_${i + 1}`, title: o.title, description: o.description }));
-  const textMenu = `${body}\n\n${options.map((o, i) => `${i + 1}. ${o.text}`).join("\n")}`
+  const textMenu = `${body}\n\n${MENU_ORDER.map(i => `${i + 1}. ${options[i].text}`).join("\n")}`
     + (lang === "en" ? "\n\nType a number or ask your question. 😊" : "\n\nEscreva o número ou a sua pergunta. 😊");
 
   await whatsappService.sendList(to, {
@@ -229,8 +236,8 @@ async function sendMenu(to, lang, name) {
     footer: lang === "en" ? "You can also type your question" : "Também pode escrever a sua pergunta",
     button: lang === "en" ? "See options" : "Ver opções",
   }, [
-    { title: lang === "en" ? "Prices" : "Preços", rows: rows.slice(0, 4) },
-    { title: lang === "en" ? "Salon" : "Salão", rows: rows.slice(4) },
+    { title: lang === "en" ? "Prices" : "Preços", rows: MENU_ORDER.slice(0, 6).map(i => rows[i]) },
+    { title: lang === "en" ? "Salon" : "Salão", rows: MENU_ORDER.slice(6).map(i => rows[i]) },
   ], textMenu);
 
   aiService.addToHistory(to, "assistant", textMenu);
@@ -254,7 +261,7 @@ async function sendTeamContact(to, lang, message = TEAM_CONTACT[lang] || TEAM_CO
 }
 
 // -------------------------------------------------------
-// Processa uma opção do menu (1 a 7), escrita ou tocada na lista
+// Processa uma opção do menu (1 a 9), escrita ou tocada na lista
 // -------------------------------------------------------
 async function handleMenuSelection(to, number, lang) {
   const index = parseInt(number, 10) - 1;
@@ -621,8 +628,8 @@ async function handleText(from, name, text, lang) {
     }
   }
 
-  // C. Seleção numérica do menu (usuário digitou "1" a "7")
-  if (/^[1-7]$/.test(text.trim())) {
+  // C. Seleção numérica do menu (usuário digitou "1" a "9")
+  if (/^[1-9]$/.test(text.trim())) {
     const handled = await handleMenuSelection(from, text.trim(), lang);
     if (handled) return;
   }

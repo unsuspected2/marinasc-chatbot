@@ -1,31 +1,135 @@
 {
-  "_ajuda": "Duração dos serviços e quantas clientes cada área atende ao mesmo tempo. Ver docs/GUIA.md, secção Agenda.",
+  "_ajuda": "Duração dos serviços (minutos) e quantas clientes cada área atende ao mesmo tempo. Uma área com 'horario' usa esse horário em vez do do salão. Ver docs/GUIA.md, secção Agenda.",
   "intervalo_min": 30,
   "antecedencia_min": 60,
   "areas": {
+    "barbearia": {
+      "nome": "Barbearia",
+      "profissionais": 1,
+      "duracao_min": 30,
+      "palavras": [
+        "barbearia",
+        "barba",
+        "degrade",
+        "corte masculino",
+        "corte infantil",
+        "desenho no cabelo"
+      ],
+      "horario": {
+        "segunda": [
+          "08:30",
+          "19:30"
+        ],
+        "terca": [
+          "08:30",
+          "19:30"
+        ],
+        "quarta": [
+          "08:30",
+          "19:30"
+        ],
+        "quinta": [
+          "08:30",
+          "19:30"
+        ],
+        "sexta": [
+          "08:30",
+          "19:30"
+        ],
+        "sabado": [
+          "08:30",
+          "17:30"
+        ],
+        "domingo": null
+      }
+    },
     "trancas": {
       "nome": "Tranças e penteados",
       "profissionais": 2,
       "duracao_min": 180,
-      "palavras": ["bobe", "cordolete", "twist", "dread", "nago", "virada", "braid", "knotless", "french curl", "penteado", "peruca", "aplicacao de cabelo", "sanguita"]
+      "palavras": [
+        "bobe",
+        "cordolete",
+        "twist",
+        "dread",
+        "nago",
+        "virada",
+        "braid",
+        "knotless",
+        "french curl",
+        "penteado",
+        "peruca",
+        "aplicacao de cabelo",
+        "sanguita",
+        "cabelo organico",
+        "cabelo da cliente",
+        "sul-africano",
+        "sul africano",
+        "chocolate",
+        "fio a fio",
+        "personalizacao",
+        "simulacao"
+      ]
     },
     "unhas": {
       "nome": "Unhas",
       "profissionais": 1,
       "duracao_min": 60,
-      "palavras": ["unha", "gel", "porcelana", "gelinho", "manicure", "pedicure", "pe"]
+      "palavras": [
+        "unha",
+        "gel",
+        "porcelana",
+        "gelinho",
+        "manicure",
+        "pedicure",
+        "pe"
+      ]
     },
     "rosto": {
       "nome": "Sobrancelhas e pestanas",
       "profissionais": 1,
       "duracao_min": 30,
-      "palavras": ["sobrancelha", "pestana", "henna"]
+      "palavras": [
+        "sobrancelha",
+        "pestana",
+        "henna"
+      ]
     },
     "cabelo": {
       "nome": "Cabelo",
       "profissionais": 1,
       "duracao_min": 90,
-      "palavras": ["corte", "escova", "lavagem", "tratamento", "hidratacao", "alisamento", "coloracao", "mecha"]
+      "palavras": [
+        "corte",
+        "escova",
+        "lavagem",
+        "tratamento",
+        "hidratacao",
+        "alisamento",
+        "coloracao",
+        "mecha",
+        "desfriso",
+        "mise",
+        "brushing",
+        "bigodinho",
+        "rolos",
+        "pintura",
+        "nuances",
+        "descolorar",
+        "queratina",
+        "keratina"
+      ]
+    },
+    "spa": {
+      "nome": "Spa e estética",
+      "profissionais": 1,
+      "duracao_min": 60,
+      "palavras": [
+        "massagem",
+        "depilacao",
+        "limpeza facial",
+        "modeladora"
+      ]
     }
   },
   "duracoes": {
@@ -40,6 +144,20 @@
     "Alongamento de gel": 90,
     "Alongamento de porcelana": 120,
     "Sobrancelhas": 20,
-    "Henna": 30
+    "Henna": 30,
+    "Depilação buço": 15,
+    "Depilação axila": 20,
+    "Depilação axilas (homem)": 20,
+    "Depilação meia perna": 30,
+    "Depilação braço completo": 30,
+    "Limpeza facial com massagem": 90,
+    "Corte + barba": 45,
+    "Desenho no cabelo": 20,
+    "Lavagem + hidratação (barbearia)": 45,
+    "Aplicação de queratina": 180,
+    "Desfriso intercalar": 60,
+    "Brushing": 45,
+    "Lavagem com brushing (cabelo natural)": 60,
+    "Bigodinho": 90
   }
 }
