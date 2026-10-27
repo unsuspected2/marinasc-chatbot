@@ -4,6 +4,7 @@
 |---|---|---|
 | Instagram | @marynasc_salao_de_beleza_ | fotos e Reels dos trabalhos, stories, mensagens (bot, depois de ligado) |
 | TikTok | @salao.marinasc | os mesmos vídeos curtos, para chegar a quem ainda não nos conhece |
+| Facebook | página MariNasc (link no Instagram) | os mesmos posts; partilhar a partir do Instagram |
 | Google (Maps e Pesquisa) | MARINASC | quem procura "salão Kilamba": horário, preços, avaliações, direcções |
 | WhatsApp do bot | 955 705 188 | marcações 24 h; a equipa confirma no 946 397 096 |
 
@@ -11,11 +12,15 @@
 
 **Instagram**: Editar perfil → Biografia (máx. 150 caracteres):
 ```
-✨ Salão MariNasc · Kilamba C19, Apt. 41
-💇🏾‍♀️ Tranças · 💅🏾 Unhas · 🌸 Spa · 💈 Barbearia
-📲 Marcações 24h no WhatsApp 👇
+Realçamos a tua beleza com cuidado ✨
+Cabelo • Tranças • Barbearia • Unhas • Spa
+📍Kilamba | C19, Apt. 41
+📲 Marcações 24h pelo WhatsApp ⬇️
 ```
-Site/link: `https://marinasc.marinasc-chatbot.workers.dev`
+(É a bio em uso desde 27/10/2026.)
+Ligações (só se mudam na app do telemóvel: Editar perfil → Ligações): hoje são marinasc.rf.gr,
+TikTok e Facebook. Acrescentar o site `https://marinasc.marinasc-chatbot.workers.dev` e o WhatsApp
+`https://wa.me/244955705188`.
 Botão de contacto (conta profissional → Opções de contacto): WhatsApp **955 705 188**.
 
 **TikTok**: Editar perfil → Biografia (máx. 80 caracteres):
