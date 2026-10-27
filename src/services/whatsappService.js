@@ -5,8 +5,7 @@
 // Funções disponíveis:
 //  - sendTextMessage      → mensagem de texto simples
 //  - sendMenuMessage      → menu numerado (quick reply textual)
-//  - sendTypingIndicator  → indicador "digitando..." (read receipt)
-//  - markAsRead           → marcar mensagem como lida
+//  - markAsRead           → marcar como lida + "a escrever..."
 //  - parseIncomingMessage → extrai dados do payload do webhook
 // ============================================================
 
@@ -88,7 +87,8 @@ async function sendMenuMessage(to, title, options) {
 }
 
 // -------------------------------------------------------
-// Marca uma mensagem recebida como lida (✓✓ azul)
+// Marca uma mensagem recebida como lida (✓✓ azul) e mostra
+// "a escrever..." ao cliente até a resposta seguir (máx. 25 s).
 // -------------------------------------------------------
 async function markAsRead(messageId) {
   try {
@@ -96,11 +96,12 @@ async function markAsRead(messageId) {
       messaging_product: "whatsapp",
       status: "read",
       message_id: messageId,
-    });
+      typing_indicator: { type: "text" },
+    }, { timeout: 5000 });
     logger.debug("Mensagem marcada como lida", { messageId });
   } catch (err) {
-    // Não é crítico — falha silenciosa
-    logger.warn("Não foi possível marcar mensagem como lida", err.message);
+    // Não é crítico — a resposta segue na mesma
+    logger.warn("Não foi possível marcar mensagem como lida", err.response?.data?.error?.message || err.message);
   }
 }
 

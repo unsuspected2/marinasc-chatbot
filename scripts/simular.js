@@ -13,6 +13,7 @@
 process.env.VERIFY_TOKEN ||= "simulacao";
 process.env.WHATSAPP_TOKEN ||= "simulacao";
 process.env.PHONE_NUMBER_ID ||= "simulacao";
+process.env.LOG_FILE = "off"; // a simulação não suja o logs/bot.log
 
 const whatsappService = require("../src/services/whatsappService");
 
@@ -36,12 +37,14 @@ const EXEMPLOS = [
   "quero falar com uma pessoa",
 ];
 
-function payload(text) {
+let contador = 0;
+
+function payload(text, id = `simulado-${++contador}`) {
   return {
     entry: [{
       changes: [{
         value: {
-          messages: [{ id: "simulado", from: "244900000000", type: "text", text: { body: text } }],
+          messages: [{ id, from: "244900000000", type: "text", text: { body: text } }],
           contacts: [{ profile: { name: "Cliente" } }],
         },
       }],
@@ -56,5 +59,11 @@ const fakeRes = { status: () => ({ json: () => {} }) };
   for (const text of mensagens) {
     console.log(`👩🏾 ${text}`);
     await handleIncomingMessage({ body: payload(text) }, fakeRes);
+  }
+
+  // A Meta às vezes reenvia o mesmo evento: o bot não deve responder outra vez
+  if (mensagens === EXEMPLOS) {
+    console.log("👩🏾 Olá  (reenvio da Meta com o mesmo id; não deve haver resposta)");
+    await handleIncomingMessage({ body: payload("Olá", "simulado-1") }, fakeRes);
   }
 })();

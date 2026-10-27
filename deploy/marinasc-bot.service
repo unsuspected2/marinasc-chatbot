@@ -1,0 +1,19 @@
+# Serviço do bot MARINASC (systemd de utilizador).
+# Instalação e comandos: ver docs/ARRANQUE-AUTOMATICO.md
+[Unit]
+Description=Bot de WhatsApp do MARINASC
+After=network-online.target
+Wants=network-online.target
+# Tenta para sempre: o disco do projecto pode montar uns segundos depois do login
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/run/media/josaid/4A2EE4DC2EE4C255/main_web/marinasc-chatbot
+ExecStart=/home/josaid/.nvm/versions/node/v22.23.2/bin/node src/server.js
+Environment=NODE_ENV=production
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=default.target

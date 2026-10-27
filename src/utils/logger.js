@@ -1,9 +1,12 @@
 // ============================================================
 // utils/logger.js
 // Logger centralizado com níveis de severidade e timestamps.
-// Substitua por winston/pino em produção conforme necessário.
+// Escreve no terminal (com cores) e em logs/bot.log (sem cores).
+// Tokens e chaves são sempre tapados antes de escrever.
 // ============================================================
 
+const fs = require("fs");
+const path = require("path");
 const config = require("../config/env");
 
 // Cores ANSI para o terminal
@@ -16,6 +19,51 @@ const COLORS = {
   cyan: "\x1b[36m",
   magenta: "\x1b[35m",
 };
+
+// -------------------------------------------------------
+// Ficheiro de log: logs/bot.log, roda para bot.log.1 aos 5 MB.
+// LOG_FILE=off desliga (o simulador usa isto).
+// -------------------------------------------------------
+const LOG_DIR = path.join(__dirname, "../../logs");
+const LOG_PATH = path.join(LOG_DIR, "bot.log");
+const MAX_LOG_BYTES = 5 * 1024 * 1024;
+const fileEnabled = process.env.LOG_FILE !== "off";
+
+if (fileEnabled) fs.mkdirSync(LOG_DIR, { recursive: true });
+
+function writeToFile(line) {
+  if (!fileEnabled) return;
+  try {
+    if (fs.existsSync(LOG_PATH) && fs.statSync(LOG_PATH).size > MAX_LOG_BYTES) {
+      fs.renameSync(LOG_PATH, `${LOG_PATH}.1`);
+    }
+    fs.appendFileSync(LOG_PATH, line.replace(/\x1b\[\d+m/g, "") + "\n");
+  } catch {
+    // Disco cheio ou sem permissão: o terminal continua a mostrar o log
+  }
+}
+
+// -------------------------------------------------------
+// Tapa segredos: os valores do .env e formatos conhecidos de tokens
+// -------------------------------------------------------
+const SECRETS = [config.whatsappToken, config.verifyToken, config.openaiApiKey]
+  .filter(s => s && s.length >= 8);
+
+function redact(text) {
+  let out = text;
+  for (const s of SECRETS) out = out.split(s).join("[oculto]");
+  return out
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [oculto]")
+    .replace(/\bEAA[A-Za-z0-9]{20,}/g, "[oculto]")
+    .replace(/\bsk-[A-Za-z0-9_-]{20,}/g, "[oculto]");
+}
+
+// Escreve no terminal e no ficheiro
+function emit(stream, line) {
+  const safe = redact(line);
+  stream(safe);
+  writeToFile(safe);
+}
 
 // Formata timestamp no padrão ISO local
 function timestamp() {
@@ -36,56 +84,54 @@ function formatData(data) {
 const logger = {
   // Informações gerais de fluxo
   info(message, data) {
-    console.log(
+    emit(console.log,
       `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.green}INFO${COLORS.reset}  ${message}${formatData(data)}`
     );
   },
 
   // Mensagens recebidas do WhatsApp
   incoming(from, message) {
-    console.log(
+    emit(console.log,
       `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.cyan}RECV${COLORS.reset}  De: ${from} | Msg: "${message}"`
     );
   },
 
   // Respostas enviadas ao usuário
   outgoing(to, message) {
-    console.log(
+    emit(console.log,
       `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.magenta}SENT${COLORS.reset}  Para: ${to} | Resp: "${message.substring(0, 80)}${message.length > 80 ? "..." : ""}"`
     );
   },
 
   // Alertas não críticos
   warn(message, data) {
-    console.warn(
+    emit(console.warn,
       `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.yellow}WARN${COLORS.reset}  ${message}${formatData(data)}`
     );
   },
 
-  // Erros — sempre loga stack se disponível
+  // Erros: uma linha com o essencial (status HTTP e mensagem da API, ou stack)
   error(message, err) {
-    console.error(
-      `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.red}ERROR${COLORS.reset} ${message}`
-    );
+    let detail = "";
     if (err) {
       if (err.response) {
         // Erro de resposta HTTP (Axios / fetch)
-        console.error(
-          `${COLORS.red}  → Status: ${err.response.status} | Body:${COLORS.reset}`,
-          err.response.data
-        );
+        detail = `\n  → Status: ${err.response.status} | Body: ${formatData(err.response.data).slice(3)}`;
       } else if (err.stack) {
-        console.error(`${COLORS.red}  → ${err.stack}${COLORS.reset}`);
+        detail = `\n  → ${err.stack}`;
       } else {
-        console.error(`${COLORS.red}  → ${err}${COLORS.reset}`);
+        detail = `\n  → ${typeof err === "string" ? err : formatData(err).slice(3)}`;
       }
     }
+    emit(console.error,
+      `${COLORS.gray}[${timestamp()}]${COLORS.reset} ${COLORS.red}ERROR${COLORS.reset} ${message}${COLORS.red}${detail}${COLORS.reset}`
+    );
   },
 
   // Logs de debug — só aparecem se DEBUG=true no .env
   debug(message, data) {
     if (config.debug) {
-      console.log(
+      emit(console.log,
         `${COLORS.gray}[${timestamp()}] DEBUG ${message}${formatData(data)}${COLORS.reset}`
       );
     }

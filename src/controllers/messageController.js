@@ -79,6 +79,31 @@ const TEAM_CONTACT = {
 };
 
 // -------------------------------------------------------
+// Resposta quando algo falha (Meta, OpenAI ou o próprio bot)
+// -------------------------------------------------------
+const FALLBACK = {
+  pt: "Desculpe, tive um problema. Fale connosco: https://wa.me/244946397096",
+  en: "Sorry, something went wrong. Talk to us: https://wa.me/244946397096",
+};
+
+// -------------------------------------------------------
+// Mensagens já tratadas (message.id → hora). A Meta pode reenviar
+// o mesmo evento; assim o cliente nunca recebe a resposta duas vezes.
+// -------------------------------------------------------
+const seenMessages = new Map();
+const SEEN_TTL_MS = 24 * 60 * 60 * 1000;
+
+function isDuplicate(messageId) {
+  const now = Date.now();
+  if (seenMessages.size > 5000) {
+    for (const [id, at] of seenMessages) if (now - at > SEEN_TTL_MS) seenMessages.delete(id);
+  }
+  if (seenMessages.has(messageId)) return true;
+  seenMessages.set(messageId, now);
+  return false;
+}
+
+// -------------------------------------------------------
 // Comandos especiais do sistema
 // -------------------------------------------------------
 const COMMANDS = {
@@ -204,6 +229,9 @@ async function handleIncomingMessage(req, res) {
   // Responde 200 imediatamente para a Meta não reenviar o webhook
   res.status(200).json({ status: "ok" });
 
+  let from = null;
+  let lang = "pt";
+
   try {
     // 1. Parse do payload
     const parsed = whatsappService.parseIncomingMessage(req.body);
@@ -213,16 +241,22 @@ async function handleIncomingMessage(req, res) {
       return;
     }
 
-    const { messageId, from, name, text } = parsed;
+    const { messageId, name, text } = parsed;
+    from = parsed.from;
+
+    if (isDuplicate(messageId)) {
+      logger.info("Mensagem repetida pela Meta — ignorada", { messageId });
+      return;
+    }
 
     // 2. Loga mensagem recebida
     logger.incoming(from, text);
 
-    // 3. Marca como lida (async — não bloqueia o fluxo)
-    whatsappService.markAsRead(messageId).catch(() => {});
+    // 3. Marca como lida e mostra "a escrever..." enquanto o bot pensa
+    await whatsappService.markAsRead(messageId);
 
     // 4. Detecta idioma da mensagem
-    const lang = aiService.detectLanguage(text);
+    lang = aiService.detectLanguage(text);
 
     // 5. Normaliza para comparações
     const normalizedText = normalizeText(text);
@@ -282,14 +316,15 @@ async function handleIncomingMessage(req, res) {
 
     // G. Busca no FAQ
     const faqAnswer = faqService.findAnswer(text);
-    await whatsappService.sendTextMessage(from, faqAnswer || (lang === "en"
-      ? "Thanks for your message! 💖 Type *menu* to see the options, or talk to our team on WhatsApp +244 946 397 096: https://wa.me/244946397096"
-      : "Obrigado pela mensagem! 💖 Escreva *menu* para ver as opções, ou fale com a nossa equipa no WhatsApp 946 397 096: https://wa.me/244946397096"));
+    await whatsappService.sendTextMessage(from, faqAnswer || FALLBACK[lang] || FALLBACK.pt);
 
   } catch (err) {
-    logger.error("Erro crítico ao processar mensagem", err);
-    // Não responde novamente pois o 200 já foi enviado.
-    // Em produção: salve o erro em um sistema de monitoramento (Sentry, Datadog, etc.)
+    logger.error("Erro ao processar mensagem", err);
+    // O cliente não fica sem resposta: tenta enviar a mensagem de recurso
+    if (from) {
+      await whatsappService.sendTextMessage(from, FALLBACK[lang] || FALLBACK.pt)
+        .catch(() => logger.error("Também falhou o envio da mensagem de recurso", { from }));
+    }
   }
 }
 
@@ -302,7 +337,7 @@ function verifyWebhook(req, res) {
   const token     = req.query["hub.verify_token"];
   const challenge = req.query["hub.challenge"];
 
-  logger.info("Requisição de verificação do webhook recebida", { mode, token });
+  logger.info("Requisição de verificação do webhook recebida", { mode });
 
   if (mode === "subscribe" && token === require("../config/env").verifyToken) {
     logger.info("✅ Webhook verificado com sucesso!");

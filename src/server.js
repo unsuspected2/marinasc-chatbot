@@ -90,8 +90,9 @@ process.on("unhandledRejection", (reason, promise) => {
 });
 
 process.on("uncaughtException", (err) => {
-  logger.error("Exceção não capturada — o servidor continuará rodando", err);
-  // Em produção: considere reiniciar via PM2 ou similar após logar
+  // O estado do processo já não é fiável: sai e o systemd arranca-o de novo
+  logger.error("Exceção não capturada — a reiniciar o bot", err);
+  process.exit(1);
 });
 
 // ============================================================
@@ -111,7 +112,8 @@ const server = app.listen(config.port, () => {
   }
 });
 
-// Graceful shutdown
+// Graceful shutdown (systemctl stop envia SIGTERM; Ctrl+C envia SIGINT)
+process.on("SIGINT", () => process.emit("SIGTERM"));
 process.on("SIGTERM", () => {
   logger.info("SIGTERM recebido — encerrando servidor graciosamente...");
   server.close(() => {
