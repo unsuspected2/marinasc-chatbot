@@ -3,19 +3,22 @@
 // Cérebro do chatbot: orquestra todo o fluxo de decisão.
 //
 // Pipeline de processamento:
-//  1. Parse do payload recebido
-//  2. Marcar mensagem como lida
-//  3. Verificar comandos especiais (/start, /help, /menu)
-//  4. Números do menu (1 a 7) e cumprimentos simples
-//  5. Conversa livre: OpenAI, com o histórico da conversa
-//  6. Sem IA: keywords de fluxos especiais e FAQ
-//  7. Enviar resposta ao usuário
+//  1. Parse do payload recebido e descarte de repetidos
+//  2. Marcar mensagem como lida + "a escrever..."
+//  3. Áudio → transcrição; foto/vídeo/documento → encaminha para a equipa
+//  4. Botões e listas interactivas, números do menu (1 a 7), comandos
+//  5. Cumprimento simples → menu com saudação pela hora de Luanda
+//  6. Conversa livre: OpenAI, com o histórico da conversa
+//  7. Sem IA: keywords de fluxos especiais e FAQ
 // ============================================================
 
 const whatsappService = require("../services/whatsappService");
 const faqService      = require("../services/faqService");
 const aiService       = require("../services/aiService");
+const horario         = require("../utils/horario");
 const logger          = require("../utils/logger");
+
+const TEAM_URL = "https://wa.me/244946397096";
 
 // -------------------------------------------------------
 // Mapeamento de keywords → fluxos customizados
@@ -36,54 +39,63 @@ const KEYWORD_FLOWS = {
   complaintTriggers: ["reclamação", "reclamacao", "complaint", "problema",
                        "errado", "errada", "incorreto", "insatisfeito", "insatisfeita",
                        "chateado", "chateada", "mal atendido", "mal atendida"],
+
+  // Perguntas de preço (sem resposta no FAQ → "o preço depende")
+  priceTriggers: ["quanto", "qt", "qto", "preço", "preco", "custa", "valor", "price", "cost"],
 };
 
+// Palavras de cortesia que não mudam um cumprimento ("olá, tudo bem?")
+const GREETING_FILLER = ["tudo bem", "td bem", "tudo bom", "como esta", "como estao",
+                          "boas", "bom", "boa", "dia", "tarde", "noite", "e ai", "ei"];
+
 // -------------------------------------------------------
-// Respostas de menu (PT e EN)
+// Opções do menu principal (lista interactiva e menu em texto)
+// O número de cada opção continua a funcionar escrito ("1" a "7").
 // -------------------------------------------------------
-const MENUS = {
-  pt: {
-    title: "💖 Olá! Boas-vindas ao *MARINASC Salão de Beleza*\nBeleza · Cuidado · Confiança\n\nComo podemos ajudar?",
-    options: [
-      "💇🏾‍♀️ Tranças e twists (preços)",
-      "💅🏾 Unhas (preços)",
-      "✨ Sobrancelhas, pestanas e henna",
-      "💆🏾‍♀️ Cabelo e aplicação",
-      "📍 Horário e localização",
-      "📅 Fazer uma marcação",
-      "👤 Falar com a nossa equipa",
-    ],
-    footer: "\nDigite o número ou escreva a sua pergunta. 😊",
-  },
-  en: {
-    title: "💖 Hello! Welcome to *MARINASC Beauty Salon* in Kilamba, Luanda.\n\nHow can we help?",
-    options: [
-      "💇🏾‍♀️ Braids and twists (prices)",
-      "💅🏾 Nails (prices)",
-      "✨ Brows, lashes and henna",
-      "💆🏾‍♀️ Hair and extensions",
-      "📍 Opening hours and location",
-      "📅 Book an appointment",
-      "👤 Talk to our team",
-    ],
-    footer: "\nType a number or ask your question. Prices are in Kwanza (Kz). 😊",
-  },
+const MENU_OPTIONS = {
+  pt: [
+    { title: "Tranças e twists", description: "Bobes, cordoletes, twists, dreads…", text: "💇🏾‍♀️ Tranças e twists (preços)" },
+    { title: "Unhas", description: "Gelinho, gel, porcelana, pedicure", text: "💅🏾 Unhas (preços)" },
+    { title: "Sobrancelhas e pestanas", description: "Sobrancelhas, pestanas e henna", text: "✨ Sobrancelhas, pestanas e henna" },
+    { title: "Cabelo e aplicação", description: "Aplicação, tratamentos, perucas", text: "💆🏾‍♀️ Cabelo e aplicação" },
+    { title: "Horário e localização", description: "Kilamba, Edifício C19", text: "📍 Horário e localização" },
+    { title: "Fazer uma marcação", description: "Preparamos o pedido para a equipa", text: "📅 Fazer uma marcação" },
+    { title: "Falar com a equipa", description: "WhatsApp do salão 946 397 096", text: "👤 Falar com a nossa equipa" },
+  ],
+  en: [
+    { title: "Braids and twists", description: "Prices", text: "💇🏾‍♀️ Braids and twists (prices)" },
+    { title: "Nails", description: "Prices", text: "💅🏾 Nails (prices)" },
+    { title: "Brows and lashes", description: "Brows, lashes and henna", text: "✨ Brows, lashes and henna" },
+    { title: "Hair and extensions", description: "Prices", text: "💆🏾‍♀️ Hair and extensions" },
+    { title: "Hours and location", description: "Kilamba, Building C19", text: "📍 Opening hours and location" },
+    { title: "Book an appointment", description: "We prepare the request for the team", text: "📅 Book an appointment" },
+    { title: "Talk to our team", description: "Salon WhatsApp +244 946 397 096", text: "👤 Talk to our team" },
+  ],
+};
+
+// Opção do menu → chave do FAQ (null = falar com a equipa)
+const MENU_FAQ_KEYS = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null];
+
+// Botões que seguem as respostas de preços: o próximo passo
+const NEXT_STEP_BUTTONS = {
+  pt: [{ id: "btn_marcar", title: "📅 Marcar" }, { id: "btn_menu", title: "📋 Ver opções" }, { id: "btn_equipa", title: "👤 Falar c/ equipa" }],
+  en: [{ id: "btn_marcar", title: "📅 Book" }, { id: "btn_menu", title: "📋 Options" }, { id: "btn_equipa", title: "👤 Talk to team" }],
 };
 
 // -------------------------------------------------------
 // Este número é só do bot: a equipa atende no WhatsApp do salão
 // -------------------------------------------------------
 const TEAM_CONTACT = {
-  pt: "👤 Para falar com a nossa equipa, use o WhatsApp do salão: *946 397 096*\n👉 https://wa.me/244946397096\n\nAtendemos de segunda a sexta das 8h às 21h, sábado e domingo das 9h às 20h. 💖",
-  en: "👤 To talk to our team, message the salon on WhatsApp: *+244 946 397 096*\n👉 https://wa.me/244946397096\n\nOpen Mon–Fri 8am–9pm, Sat–Sun 9am–8pm. 💖",
+  pt: "👤 A nossa equipa atende no WhatsApp do salão, *946 397 096*. Toque no botão para falar connosco. 💖",
+  en: "👤 Our team answers on the salon WhatsApp, *+244 946 397 096*. Tap the button to talk to us. 💖",
 };
 
 // -------------------------------------------------------
 // Resposta quando algo falha (Meta, OpenAI ou o próprio bot)
 // -------------------------------------------------------
 const FALLBACK = {
-  pt: "Desculpe, tive um problema. Fale connosco: https://wa.me/244946397096",
-  en: "Sorry, something went wrong. Talk to us: https://wa.me/244946397096",
+  pt: `Desculpe, tive um problema. Fale connosco: ${TEAM_URL}`,
+  en: `Sorry, something went wrong. Talk to us: ${TEAM_URL}`,
 };
 
 // -------------------------------------------------------
@@ -119,23 +131,20 @@ const COMMANDS = {
 // -------------------------------------------------------
 
 async function handleStart(to, name, lang) {
-  const greeting = lang === "en"
-    ? `💖 Welcome to MARINASC, ${name}! Here are the options:`
-    : `💖 Olá, ${name}! Boas-vindas ao MARINASC Salão de Beleza. Veja as opções:`;
-
-  await sendMenu(to, lang, greeting);
+  aiService.clearMemory(to);
+  await sendMenu(to, lang, name);
 }
 
 async function handleHelp(to, _name, lang) {
   const text = lang === "en"
-    ? `ℹ️ *Help*\n\nYou can:\n• Ask questions directly\n• Type a number from the menu\n• Use commands:\n  /start — Restart\n  /menu — Show menu\n  /reset — Clear conversation history\n\nNeed human support? Just ask!`
-    : `ℹ️ *Ajuda*\n\nPode:\n• Fazer perguntas directamente (ex.: "quanto custa cordoletes?")\n• Digitar um número do menu\n• Usar comandos:\n  /start — Recomeçar\n  /menu — Ver menu\n  /reset — Apagar o histórico da conversa\n\nPrefere falar com a nossa equipa? É só pedir!`;
+    ? `ℹ️ *Help*\n\nYou can:\n• Ask questions directly\n• Tap the options or type a number from the menu\n• Send a voice note\n• Use commands:\n  /start — Restart\n  /menu — Show menu\n  /reset — Clear conversation history\n\nNeed human support? Just ask!`
+    : `ℹ️ *Ajuda*\n\nPode:\n• Fazer perguntas directamente (ex.: "quanto custa cordoletes?")\n• Tocar nas opções ou escrever um número do menu\n• Enviar um áudio\n• Usar comandos:\n  /start — Recomeçar\n  /menu — Ver menu\n  /reset — Apagar o histórico da conversa\n\nPrefere falar com a nossa equipa? É só pedir!`;
 
   await whatsappService.sendTextMessage(to, text);
 }
 
-async function handleMenuCommand(to, _name, lang) {
-  await sendMenu(to, lang);
+async function handleMenuCommand(to, name, lang) {
+  await sendMenu(to, lang, name);
 }
 
 async function handleReset(to, _name, lang) {
@@ -157,47 +166,112 @@ async function handleFaqList(to, _name, lang) {
   await whatsappService.sendTextMessage(to, text);
 }
 
-// -------------------------------------------------------
-// Envia menu principal
-// -------------------------------------------------------
-async function sendMenu(to, lang, customTitle) {
-  const menu = MENUS[lang] || MENUS.pt;
-  const title = customTitle || menu.title;
-  const fullText = `${title}\n\n${menu.options.map((o, i) => `${i + 1}. ${o}`).join("\n")}${menu.footer}`;
-  await whatsappService.sendTextMessage(to, fullText);
-  aiService.addToHistory(to, "assistant", fullText);
+// Primeiro nome do perfil do WhatsApp ("Josaid do Nascimento" → "Josaid")
+function firstName(name) {
+  const first = (name || "").trim().split(/\s+/)[0] || "";
+  return /\p{L}/u.test(first) ? first : "";
 }
 
 // -------------------------------------------------------
-// Processa seleção numérica do menu (ex: usuário digitou "2")
+// Envia menu principal: lista interactiva com saudação pela hora
+// de Luanda e aviso se o salão estiver fechado.
 // -------------------------------------------------------
-async function handleMenuSelection(to, number, lang) {
-  // Mapeia número → FAQ key ou resposta
-  const menuMap = {
-    pt: ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null],
-    en: ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_horario", "menu_marcar", null],
-  };
+async function sendMenu(to, lang, name) {
+  const t = horario.agora();
+  const nome = firstName(name);
+  const status = horario.estado(t);
 
-  const map = menuMap[lang] || menuMap.pt;
-  const index = parseInt(number) - 1;
-
-  if (index < 0 || index >= map.length) return false;
-
-  const key = map[index];
-
-  // Opção 7: falar com atendente; as outras vêm do FAQ
-  const answer = key === null
-    ? (lang === "en" ? TEAM_CONTACT.en : TEAM_CONTACT.pt)
-    : faqService.findAnswer(key);
-  if (answer) {
-    await whatsappService.sendTextMessage(to, answer);
-    // A IA fica a saber o que a pessoa escolheu, para a conversa continuar daí
-    aiService.addToHistory(to, "user", number);
-    aiService.addToHistory(to, "assistant", answer);
-    return true;
+  let body;
+  if (lang === "en") {
+    const hello = t.hora >= 5 && t.hora < 12 ? "Good morning" : t.hora < 19 && t.hora >= 12 ? "Good afternoon" : "Good evening";
+    body = `💖 ${hello}${nome ? `, ${nome}` : ""}! Welcome to *MARINASC Beauty Salon*.`
+      + (status.aberto ? "" : `\n\nWe're closed right now (${horario.estadoTexto(t).replace(/^Neste momento estamos fechados\.\s*/, "")}). You can still leave your booking request and the team confirms when we open.`)
+      + "\n\nHow can we help?";
+  } else {
+    body = `💖 ${horario.saudacao(t)}${nome ? `, ${nome}` : ""}! Boas-vindas ao *MARINASC Salão de Beleza*.\n${horario.estadoTexto(t)}`
+      + (status.aberto ? "" : "\nPode deixar já o seu pedido de marcação e a equipa confirma quando abrirmos. 📅")
+      + "\n\nComo podemos ajudar?";
   }
 
-  return false;
+  const options = MENU_OPTIONS[lang] || MENU_OPTIONS.pt;
+  const rows = options.map((o, i) => ({ id: `menu_${i + 1}`, title: o.title, description: o.description }));
+  const textMenu = `${body}\n\n${options.map((o, i) => `${i + 1}. ${o.text}`).join("\n")}`
+    + (lang === "en" ? "\n\nType a number or ask your question. 😊" : "\n\nEscreva o número ou a sua pergunta. 😊");
+
+  await whatsappService.sendList(to, {
+    header: "MARINASC",
+    body,
+    footer: lang === "en" ? "You can also type your question" : "Também pode escrever a sua pergunta",
+    button: lang === "en" ? "See options" : "Ver opções",
+  }, [
+    { title: lang === "en" ? "Prices" : "Preços", rows: rows.slice(0, 4) },
+    { title: lang === "en" ? "Salon" : "Salão", rows: rows.slice(4) },
+  ], textMenu);
+
+  aiService.addToHistory(to, "assistant", textMenu);
+}
+
+// -------------------------------------------------------
+// Resposta com os botões do próximo passo (marcar, menu, equipa)
+// -------------------------------------------------------
+async function sendWithNextStep(to, text, lang) {
+  // Os botões só levam 1024 caracteres; textos maiores seguem antes
+  if (text.length > 1000) {
+    await whatsappService.sendTextMessage(to, text);
+    text = lang === "en" ? "What would you like to do next?" : "O que deseja fazer a seguir?";
+  }
+  await whatsappService.sendButtons(to, text, NEXT_STEP_BUTTONS[lang] || NEXT_STEP_BUTTONS.pt);
+}
+
+// Botão que abre o WhatsApp da equipa
+async function sendTeamContact(to, lang, message = TEAM_CONTACT[lang] || TEAM_CONTACT.pt) {
+  await whatsappService.sendLinkButton(to, message, lang === "en" ? "Open WhatsApp" : "Abrir WhatsApp", TEAM_URL);
+}
+
+// -------------------------------------------------------
+// Processa uma opção do menu (1 a 7), escrita ou tocada na lista
+// -------------------------------------------------------
+async function handleMenuSelection(to, number, lang) {
+  const index = parseInt(number, 10) - 1;
+  if (!(index >= 0 && index < MENU_FAQ_KEYS.length)) return false;
+
+  const key = MENU_FAQ_KEYS[index];
+  const options = MENU_OPTIONS[lang] || MENU_OPTIONS.pt;
+  let answer;
+
+  if (key === null) {
+    // Opção 7: falar com a equipa
+    answer = TEAM_CONTACT[lang] || TEAM_CONTACT.pt;
+    await sendTeamContact(to, lang);
+  } else if (key === "menu_marcar") {
+    // Opção 6: fazer uma marcação
+    answer = faqService.findAnswer(key);
+    await sendTeamContact(to, lang, answer.replace(/\n*👉 https:\/\/wa\.me\/\S+/, ""));
+  } else {
+    answer = faqService.findAnswer(key);
+    if (!answer) return false;
+    await sendWithNextStep(to, answer, lang);
+  }
+
+  // A IA fica a saber o que a pessoa escolheu, para a conversa continuar daí
+  aiService.addToHistory(to, "user", options[index].title);
+  aiService.addToHistory(to, "assistant", answer);
+  return true;
+}
+
+// -------------------------------------------------------
+// Botões e listas interactivas
+// -------------------------------------------------------
+async function handleInteractive(to, name, id, lang) {
+  const menuMatch = /^menu_(\d)$/.exec(id || "");
+  if (menuMatch) return handleMenuSelection(to, menuMatch[1], lang);
+
+  switch (id) {
+    case "btn_menu":   await sendMenu(to, lang, name); return true;
+    case "btn_marcar": return handleMenuSelection(to, "6", lang);
+    case "btn_equipa": return handleMenuSelection(to, "7", lang);
+    default:           return false;
+  }
 }
 
 // -------------------------------------------------------
@@ -207,7 +281,7 @@ function normalizeText(text) {
   return text
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[̀-ͯ]/g, "")
     .trim();
 }
 
@@ -220,6 +294,47 @@ function containsTrigger(normalizedText, triggers) {
     const escaped = normalizeText(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(normalizedText);
   });
+}
+
+// -------------------------------------------------------
+// É só um cumprimento? ("olá", "bom dia, tudo bem?", "oi Marinasc")
+// Se sobrar uma pergunta ("oi, quanto custa bobes?") não é.
+// -------------------------------------------------------
+function isGreetingOnly(normalizedText) {
+  if (!containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers)) return false;
+  let rest = ` ${normalizedText.replace(/[^a-z0-9\s]/g, " ")} `;
+  for (const w of [...KEYWORD_FLOWS.menuTriggers, ...GREETING_FILLER, "marinasc"].map(normalizeText)) {
+    rest = rest.split(` ${w} `).join(" ");
+  }
+  return rest.trim().split(/\s+/).filter(Boolean).length <= 1;
+}
+
+// -------------------------------------------------------
+// Áudio: transcreve com o Whisper e trata como texto escrito
+// -------------------------------------------------------
+async function transcribeIncomingAudio(mediaId) {
+  try {
+    const { buffer, mimeType } = await whatsappService.downloadMedia(mediaId);
+    return await aiService.transcribeAudio(buffer, mimeType);
+  } catch (err) {
+    logger.error("Não foi possível descarregar o áudio", err);
+    return null;
+  }
+}
+
+// -------------------------------------------------------
+// Foto, vídeo ou documento: a equipa é que avalia
+// -------------------------------------------------------
+async function handleMedia(to, type, lang) {
+  const what = { image: "a sua foto 📸", video: "o seu vídeo 🎬", document: "o seu documento 📄" }[type];
+  const text = lang === "en"
+    ? "We received your file! 📸 For our team to see it and confirm the price, please send it to the salon WhatsApp too."
+    : `Recebemos ${what}! Para a equipa ver e confirmar o preço, envie-a também para o WhatsApp do salão, 946 397 096.`
+      .replace("envie-a", type === "image" ? "envie-a" : "envie-o");
+  const url = `${TEAM_URL}?text=${encodeURIComponent("Olá! Enviei uma foto ao assistente e queria saber o preço.")}`;
+  await whatsappService.sendLinkButton(to, text, lang === "en" ? "Send to the team" : "Enviar à equipa", url);
+  aiService.addToHistory(to, "user", `[enviou ${type === "image" ? "uma foto" : type === "video" ? "um vídeo" : "um documento"}]`);
+  aiService.addToHistory(to, "assistant", text);
 }
 
 // ============================================================
@@ -237,87 +352,63 @@ async function handleIncomingMessage(req, res) {
     const parsed = whatsappService.parseIncomingMessage(req.body);
 
     if (!parsed) {
-      logger.debug("Payload sem mensagem de texto válida — ignorando.");
+      logger.debug("Payload sem mensagem — ignorando (ex.: estado de entrega).");
       return;
     }
 
-    const { messageId, name, text } = parsed;
+    const { messageId, name, type } = parsed;
     from = parsed.from;
+    let text = parsed.text;
 
     if (isDuplicate(messageId)) {
       logger.info("Mensagem repetida pela Meta — ignorada", { messageId });
       return;
     }
 
+    // Reacções (👍 numa mensagem) não pedem resposta
+    if (type === "reaction") return;
+
     // 2. Loga mensagem recebida
-    logger.incoming(from, text);
+    logger.incoming(from, type === "text" ? text : `[${type}] ${text}`.trim());
 
     // 3. Marca como lida e mostra "a escrever..." enquanto o bot pensa
     await whatsappService.markAsRead(messageId);
 
-    // 4. Detecta idioma da mensagem
-    lang = aiService.detectLanguage(text);
-
-    // 5. Normaliza para comparações
-    const normalizedText = normalizeText(text);
-
-    // -------- ROTEAMENTO DE MENSAGENS --------
-
-    // A. Comandos especiais (/start, /help, etc.)
-    const command = text.toLowerCase().split(" ")[0];
-    if (COMMANDS[command]) {
-      logger.info(`Comando recebido: ${command}`, { from });
-      await COMMANDS[command](from, name, lang);
+    // 4. Tipos que não são texto
+    if (type === "audio") {
+      text = await transcribeIncomingAudio(parsed.mediaId);
+      if (!text) {
+        await whatsappService.sendButtons(from,
+          "Recebi o seu áudio 🎤, mas de momento não consigo ouvi-lo. Pode escrever a sua pergunta?",
+          [NEXT_STEP_BUTTONS.pt[1], NEXT_STEP_BUTTONS.pt[2]]);
+        return;
+      }
+      logger.info(`🎤 Áudio transcrito: "${text}"`, { from });
+    } else if (["image", "video", "document"].includes(type)) {
+      await handleMedia(from, type, aiService.detectLanguage(text || "olá"));
+      return;
+    } else if (type === "location") {
+      await sendWithNextStep(from, faqService.findAnswer("menu_horario"), "pt");
+      return;
+    } else if (type === "sticker") {
+      await sendMenu(from, "pt", name);
+      return;
+    } else if (type !== "text" && type !== "interactive") {
+      await whatsappService.sendTextMessage(from,
+        "De momento só consigo ler texto e áudios. 😊 Escreva a sua pergunta ou toque em *menu*.");
       return;
     }
 
-    // B. Seleção numérica do menu (usuário digitou "1" a "7")
-    const isNumber = /^[1-7]$/.test(text.trim());
-    if (isNumber) {
-      const handled = await handleMenuSelection(from, text.trim(), lang);
+    // 5. Detecta idioma da mensagem
+    lang = aiService.detectLanguage(text);
+
+    // 6. Botões e listas interactivas
+    if (type === "interactive") {
+      const handled = await handleInteractive(from, name, parsed.interactiveId, lang);
       if (handled) return;
     }
 
-    // C. Só um cumprimento ("olá", "bom dia", "menu") → menu principal.
-    // Mensagens com mais conteúdo ("oi, quanto custa bobes?") seguem para a IA.
-    const isGreetingOnly = containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers)
-      && normalizedText.split(/\s+/).length <= 4;
-    if (isGreetingOnly) {
-      logger.info("Trigger de menu detectado", { from, text });
-      await sendMenu(from, lang, lang === "en" ? `💖 Hello, ${name}! How can we help?` : `💖 Olá, ${name}! Boas-vindas ao MARINASC. Como podemos ajudar?`);
-      return;
-    }
-
-    // D. Conversa livre: a IA responde com o contexto da conversa
-    const aiResponse = await aiService.getAIResponse(from, text);
-    if (aiResponse) {
-      logger.info("Resposta da IA", { from });
-      await whatsappService.sendTextMessage(from, aiResponse);
-      return;
-    }
-
-    // Sem IA (sem chave ou erro): respostas prontas por palavra-chave
-    logger.info("IA indisponível — a usar o FAQ", { from });
-
-    // E. Keywords de solicitação de atendimento humano
-    if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
-      await whatsappService.sendTextMessage(from, lang === "en" ? TEAM_CONTACT.en : TEAM_CONTACT.pt);
-      return;
-    }
-
-    // F. Keywords de reclamação
-    if (containsTrigger(normalizedText, KEYWORD_FLOWS.complaintTriggers)) {
-      const complaintText = lang === "en"
-        ? `😔 We're sorry about that.\n\nPlease tell the salon manager what happened on WhatsApp *+244 946 397 096*: https://wa.me/244946397096\nWe'll handle it with priority. 💖`
-        : `😔 Lamentamos muito pelo sucedido.\n\nConte à responsável do salão o que aconteceu, com o dia e o serviço, no WhatsApp *946 397 096*: https://wa.me/244946397096\nVamos tratar do seu caso com prioridade. 💖`;
-      await whatsappService.sendTextMessage(from, complaintText);
-      return;
-    }
-
-    // G. Busca no FAQ
-    const faqAnswer = faqService.findAnswer(text);
-    await whatsappService.sendTextMessage(from, faqAnswer || FALLBACK[lang] || FALLBACK.pt);
-
+    await handleText(from, name, text, lang);
   } catch (err) {
     logger.error("Erro ao processar mensagem", err);
     // O cliente não fica sem resposta: tenta enviar a mensagem de recurso
@@ -326,6 +417,82 @@ async function handleIncomingMessage(req, res) {
         .catch(() => logger.error("Também falhou o envio da mensagem de recurso", { from }));
     }
   }
+}
+
+// -------------------------------------------------------
+// Texto escrito (ou áudio transcrito)
+// -------------------------------------------------------
+async function handleText(from, name, text, lang) {
+  // Normaliza para comparações
+  const normalizedText = normalizeText(text);
+
+  // -------- ROTEAMENTO DE MENSAGENS --------
+
+  // A. Comandos especiais (/start, /help, etc.)
+  const command = text.toLowerCase().split(" ")[0];
+  if (COMMANDS[command]) {
+    logger.info(`Comando recebido: ${command}`, { from });
+    await COMMANDS[command](from, name, lang);
+    return;
+  }
+
+  // B. Seleção numérica do menu (usuário digitou "1" a "7")
+  if (/^[1-7]$/.test(text.trim())) {
+    const handled = await handleMenuSelection(from, text.trim(), lang);
+    if (handled) return;
+  }
+
+  // C. Só um cumprimento ("olá", "bom dia", "menu") → menu principal.
+  // Mensagens com mais conteúdo ("oi, quanto custa bobes?") seguem para a IA.
+  if (isGreetingOnly(normalizedText)) {
+    logger.info("Trigger de menu detectado", { from, text });
+    await sendMenu(from, lang, name);
+    return;
+  }
+
+  // D. Conversa livre: a IA responde com o contexto da conversa
+  const aiResponse = await aiService.getAIResponse(from, text, { name: firstName(name) });
+  if (aiResponse) {
+    logger.info("Resposta da IA", { from });
+    await whatsappService.sendTextMessage(from, aiResponse);
+    return;
+  }
+
+  // Sem IA (sem chave ou erro): respostas prontas por palavra-chave
+  logger.info("IA indisponível — a usar o FAQ", { from });
+
+  // E. Keywords de solicitação de atendimento humano
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
+    await sendTeamContact(from, lang);
+    return;
+  }
+
+  // F. Keywords de reclamação
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.complaintTriggers)) {
+    await sendTeamContact(from, lang, lang === "en"
+      ? "😔 We're sorry about that. Please tell the salon manager what happened; we'll handle it with priority. 💖"
+      : "😔 Lamentamos muito pelo sucedido. Conte à responsável do salão o que aconteceu, com o dia e o serviço; vamos tratar do seu caso com prioridade. 💖");
+    return;
+  }
+
+  // G. Busca no FAQ
+  const faqAnswer = faqService.findAnswer(text);
+  if (faqAnswer) {
+    await sendWithNextStep(from, faqAnswer, lang);
+    aiService.addToHistory(from, "user", text);
+    aiService.addToHistory(from, "assistant", faqAnswer);
+    return;
+  }
+
+  // H. Pergunta de preço sem resposta: nunca inventar
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.priceTriggers)) {
+    await sendTeamContact(from, lang, lang === "en"
+      ? "💖 The price depends on the service and style. Please confirm with our team (you can send a photo of the look you want)."
+      : "💖 O preço depende do serviço e do estilo. Confirme com a equipa; pode enviar lá uma foto do resultado que deseja.");
+    return;
+  }
+
+  await whatsappService.sendTextMessage(from, FALLBACK[lang] || FALLBACK.pt);
 }
 
 // ============================================================

@@ -1,0 +1,13 @@
+{
+  "_ajuda": "Horas no formato HH:MM (hora de Luanda). Para um dia fechado use null. Em 'fechado_em' ponha feriados no formato AAAA-MM-DD.",
+  "dias": {
+    "segunda": ["08:00", "21:00"],
+    "terca":   ["08:00", "21:00"],
+    "quarta":  ["08:00", "21:00"],
+    "quinta":  ["08:00", "21:00"],
+    "sexta":   ["08:00", "21:00"],
+    "sabado":  ["09:00", "20:00"],
+    "domingo": ["09:00", "20:00"]
+  },
+  "fechado_em": ["2026-12-25", "2027-01-01"]
+}

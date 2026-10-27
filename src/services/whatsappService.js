@@ -5,7 +5,9 @@
 // Funções disponíveis:
 //  - sendTextMessage      → mensagem de texto simples
 //  - sendMenuMessage      → menu numerado (quick reply textual)
+//  - sendButtons / sendList / sendLinkButton → mensagens interactivas
 //  - markAsRead           → marcar como lida + "a escrever..."
+//  - downloadMedia        → descarregar áudio/foto recebido
 //  - parseIncomingMessage → extrai dados do payload do webhook
 // ============================================================
 
@@ -107,26 +109,17 @@ async function markAsRead(messageId) {
 
 // -------------------------------------------------------
 // Parse do payload do webhook da WhatsApp Cloud API.
-// Retorna um objeto normalizado ou null se não for mensagem de texto.
+// Retorna um objeto normalizado ou null se não houver mensagem
+// (por exemplo, actualizações de estado "entregue"/"lida").
 //
-// Estrutura do payload (simplificada):
-// {
-//   object: "whatsapp_business_account",
-//   entry: [{
-//     changes: [{
-//       value: {
-//         messages: [{ from, id, type, text: { body } }],
-//         contacts: [{ profile: { name } }]
-//       }
-//     }]
-//   }]
-// }
+//  type: "text" | "interactive" | "audio" | "image" | outro tipo da Meta
+//  text: texto escrito, título do botão/opção escolhida, ou legenda
+//  interactiveId: id do botão ou da opção da lista (ex.: "menu_1")
+//  mediaId: id do áudio/foto para descarregar
 // -------------------------------------------------------
 function parseIncomingMessage(body) {
   try {
-    const entry = body?.entry?.[0];
-    const change = entry?.changes?.[0];
-    const value = change?.value;
+    const value = body?.entry?.[0]?.changes?.[0]?.value;
 
     // Verifica se há mensagens no payload
     if (!value?.messages || value.messages.length === 0) {
@@ -135,30 +128,134 @@ function parseIncomingMessage(body) {
 
     const message = value.messages[0];
     const contact = value.contacts?.[0];
-
-    // Só processa mensagens de texto por enquanto
-    // Futuramente: adicione suporte a 'image', 'audio', 'document'
-    if (message.type !== "text") {
-      logger.info(`Tipo de mensagem não suportado: ${message.type}`);
-      return null;
-    }
-
-    return {
+    const base = {
       messageId: message.id,
-      from: message.from,           // número com código do país: ex "5511999999999"
-      name: contact?.profile?.name || "Usuário",
-      text: message.text.body.trim(),
+      from: message.from,           // número com código do país: ex "244923000000"
+      name: contact?.profile?.name || "",
+      type: message.type,
+      text: "",
       timestamp: message.timestamp,
     };
+
+    switch (message.type) {
+      case "text":
+        return { ...base, text: message.text.body.trim() };
+      case "interactive": {
+        const reply = message.interactive?.button_reply || message.interactive?.list_reply;
+        return { ...base, interactiveId: reply?.id, text: reply?.title || "" };
+      }
+      case "button": // resposta rápida de um template
+        return { ...base, type: "interactive", interactiveId: message.button?.payload, text: message.button?.text || "" };
+      case "audio":
+        return { ...base, mediaId: message.audio?.id };
+      case "image":
+      case "video":
+      case "document":
+      case "sticker":
+        return { ...base, mediaId: message[message.type]?.id, text: (message[message.type]?.caption || "").trim() };
+      default:
+        // location, contacts, reaction, unsupported…
+        return base;
+    }
   } catch (err) {
     logger.error("Erro ao fazer parse do payload do webhook", err);
     return null;
   }
 }
 
+// -------------------------------------------------------
+// Envia uma mensagem interactiva; se a Meta a recusar, envia o
+// texto alternativo para o cliente nunca ficar sem resposta.
+// -------------------------------------------------------
+async function sendInteractive(to, interactive, fallbackText) {
+  try {
+    const response = await postWithRetry(`/${config.phoneNumberId}/messages`, {
+      messaging_product: "whatsapp",
+      recipient_type: "individual",
+      to,
+      type: "interactive",
+      interactive,
+    });
+    logger.outgoing(to, `[${interactive.type}] ${interactive.body?.text || ""}`);
+    return response.data;
+  } catch (err) {
+    if (!err.response) throw err; // rede em baixo: o texto também falharia
+    logger.warn("Mensagem interactiva recusada — a enviar texto", err.response.data?.error?.message);
+    return sendTextMessage(to, fallbackText);
+  }
+}
+
+// Corta textos aos limites da Meta
+const cut = (t, n) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
+
+// -------------------------------------------------------
+// Até 3 botões de resposta. buttons: [{ id, title }]
+// -------------------------------------------------------
+async function sendButtons(to, bodyText, buttons, fallbackText = bodyText) {
+  return sendInteractive(to, {
+    type: "button",
+    body: { text: cut(bodyText, 1024) },
+    action: {
+      buttons: buttons.slice(0, 3).map(b => ({ type: "reply", reply: { id: b.id, title: cut(b.title, 20) } })),
+    },
+  }, fallbackText);
+}
+
+// -------------------------------------------------------
+// Lista de opções (até 10). sections: [{ title, rows: [{ id, title, description }] }]
+// -------------------------------------------------------
+async function sendList(to, { header, body, footer, button }, sections, fallbackText) {
+  return sendInteractive(to, {
+    type: "list",
+    ...(header && { header: { type: "text", text: cut(header, 60) } }),
+    body: { text: cut(body, 1024) },
+    ...(footer && { footer: { text: cut(footer, 60) } }),
+    action: {
+      button: cut(button, 20),
+      sections: sections.map(sec => ({
+        title: cut(sec.title, 24),
+        rows: sec.rows.map(r => ({
+          id: r.id,
+          title: cut(r.title, 24),
+          ...(r.description && { description: cut(r.description, 72) }),
+        })),
+      })),
+    },
+  }, fallbackText);
+}
+
+// -------------------------------------------------------
+// Botão que abre um link (ex.: WhatsApp da equipa com a marcação)
+// -------------------------------------------------------
+async function sendLinkButton(to, bodyText, displayText, url) {
+  return sendInteractive(to, {
+    type: "cta_url",
+    body: { text: cut(bodyText, 1024) },
+    action: { name: "cta_url", parameters: { display_text: cut(displayText, 20), url } },
+  }, `${bodyText}\n\n👉 ${url}`);
+}
+
+// -------------------------------------------------------
+// Descarrega um áudio/foto recebido (máx. 16 MB)
+// -------------------------------------------------------
+async function downloadMedia(mediaId) {
+  const { data: info } = await graphApi.get(`/${mediaId}`);
+  const file = await axios.get(info.url, {
+    responseType: "arraybuffer",
+    headers: { Authorization: `Bearer ${config.whatsappToken}` },
+    timeout: 30000,
+    maxContentLength: 16 * 1024 * 1024,
+  });
+  return { buffer: Buffer.from(file.data), mimeType: info.mime_type };
+}
+
 module.exports = {
   sendTextMessage,
   sendMenuMessage,
+  sendButtons,
+  sendList,
+  sendLinkButton,
   markAsRead,
+  downloadMedia,
   parseIncomingMessage,
 };

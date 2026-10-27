@@ -3,15 +3,18 @@
 // Integração com a API da OpenAI como fallback inteligente.
 //
 // Recursos implementados:
-//  - Memória de conversa por usuário (últimas N mensagens)
+//  - Memória de conversa por cliente (últimas 10 mensagens, 24 h)
 //  - Detecção de idioma (PT / EN)
-//  - Prompt de sistema configurável
-//  - Graceful degradation: se a API falhar, retorna mensagem amigável
+//  - Prompt de sistema com a hora de Luanda e se o salão está aberto
+//  - Transcrição de áudios (Whisper)
+//  - Graceful degradation: se a API falhar, devolve null e o controller usa o FAQ
 // ============================================================
 
 const OpenAI = require("openai");
+const { toFile } = require("openai");
 const config = require("../config/env");
 const logger = require("../utils/logger");
+const horario = require("../utils/horario");
 
 // -------------------------------------------------------
 // Inicialização do cliente OpenAI
@@ -27,13 +30,14 @@ if (config.openaiApiKey) {
 }
 
 // -------------------------------------------------------
-// Memória de conversa: Map<phoneNumber → Array<Message>>
-// Armazena as últimas MAX_HISTORY mensagens por usuário.
-// Para produção: mova para Redis ou MongoDB com TTL.
+// Memória de conversa: Map<phoneNumber → { messages, updatedAt }>
+// Guarda as últimas MAX_HISTORY mensagens; esquece ao fim de 24 h
+// sem conversa. Fica só em memória (perde-se se o bot reiniciar).
 // -------------------------------------------------------
 const conversationMemory = new Map();
 let aiPausedUntil = 0; // quando a OpenAI fica sem créditos, o bot usa só o FAQ por uns minutos
-const MAX_HISTORY = 10; // máximo de pares usuário/assistente na memória
+const MAX_HISTORY = 10; // mensagens (cliente + bot) guardadas por cliente
+const MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
 
 // -------------------------------------------------------
 // Prompt do sistema — define a "personalidade" do bot
@@ -48,7 +52,8 @@ const SYSTEM_PROMPT_PT = `És a assistente virtual do MARINASC Salão de Beleza 
 
 COMO FALAR
 - Português de Angola, simpático e próximo, como uma recepcionista do salão a escrever no WhatsApp. Trata a pessoa por "você" ou pelo nome.
-- Mensagens curtas: 1 a 4 frases. Responde primeiro ao que perguntaram e depois, se fizer sentido, faz UMA pergunta para avançar a conversa (ex.: "É para si ou para outra pessoa?", "Prefere com ou sem cachos?", "Para que dia estava a pensar?").
+- Percebe a escrita do dia a dia em Angola: erros de escrita, abreviaturas (qt/qto = quanto, pfv = por favor, tb = também, q = que, vcs = vocês, amnh = amanhã, dps = depois) e expressões (bué = muito, mambo = coisa, kumbu = dinheiro, ya = sim). Não corrijas a pessoa.
+- Mensagens curtas: 1 a 4 frases. Responde primeiro ao que perguntaram e termina SEMPRE com um próximo passo: UMA pergunta para avançar (ex.: "É para si ou para outra pessoa?", "Prefere com ou sem cachos?", "Quer que eu prepare a marcação?") ou o link da equipa.
 - Lembra-te do que já foi dito na conversa e não repitas listas inteiras de preços. Se a pessoa já disse o serviço, fala só desse serviço.
 - Não uses linguagem de robô nem "digite 1". Podes usar 1 emoji por mensagem, no máximo.
 - Se a mensagem for só um cumprimento, cumprimenta e pergunta em que podes ajudar (tranças, unhas, sobrancelhas, cabelo).
@@ -56,11 +61,12 @@ COMO FALAR
 
 O QUE PODES DIZER
 - Usa só a informação abaixo. Nunca inventes preços, promoções, disponibilidade, duração ou serviços que não estejam na lista.
-- Se o serviço estiver "sob consulta" ou não constar, diz que a equipa confirma o valor e sugere enviar uma foto do resultado desejado.
+- Se o serviço estiver "sob consulta" ou não constar da lista, diz exactamente que o preço depende e que a pessoa deve confirmar com a equipa, com o link https://wa.me/244946397096, e sugere enviar lá uma foto do resultado desejado.
+- Se o salão estiver fechado agora (ver AGORA EM LUANDA), diz isso com simpatia, quando abre, e que pode deixar já o pedido de marcação.
 
 MARCAÇÕES, RECLAMAÇÕES E FALAR COM UMA PESSOA
 - Nunca confirmes tu uma marcação nem digas que há vaga.
-- Quando a pessoa quiser marcar, ajuda a juntar: serviço, dia e hora preferida. Quando tiveres o serviço (o resto pode faltar), dá o link da equipa já com o pedido escrito, assim: https://wa.me/244946397096?text=<pedido com espaços trocados por %20>, por exemplo https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20marcar%20cordoletes%20para%20s%C3%A1bado%20de%20manh%C3%A3. Diz que a equipa confirma a vaga.
+- Quando a pessoa quiser marcar, diz-lhe para escrever *marcar*: o assistente pergunta o serviço, o dia, a hora e o nome e prepara o pedido para a equipa, que confirma a vaga.
 - Reclamações ou pedidos para falar com uma pessoa: mostra empatia numa frase e encaminha para a equipa no WhatsApp 946 397 096 (https://wa.me/244946397096).
 - Se não souberes a resposta, encaminha para esse WhatsApp.
 
@@ -77,32 +83,56 @@ SALON INFORMATION:
 ${SALON_INFO}`;
 
 // -------------------------------------------------------
+// Contexto que muda a cada mensagem: hora, nome, promoções…
+// -------------------------------------------------------
+function buildSystemPrompt(lang, { name, extra } = {}) {
+  const t = horario.agora();
+  const parts = [
+    lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_PT,
+    `AGORA EM LUANDA: ${t.texto}. ${horario.estadoTexto(t)}`,
+  ];
+  if (name) parts.push(`NOME NO PERFIL DO WHATSAPP: ${name} (usa só o primeiro nome, se fizer sentido)`);
+  if (extra) parts.push(extra);
+  return parts.join("\n\n");
+}
+
+// -------------------------------------------------------
 // Detecta o idioma predominante da mensagem.
-// Heurística simples por palavras-chave.
+// Heurística simples por palavras inteiras (o "hi" de "filha" não conta).
 // -------------------------------------------------------
 function detectLanguage(text) {
-  const ptWords = ["olá", "oi", "bom", "obrigado", "obrigada", "preciso", "quero",
-                   "por favor", "pode", "qual", "como", "quando", "onde", "quanto"];
+  const ptWords = ["olá", "ola", "oi", "bom", "boa", "obrigado", "obrigada", "preciso", "quero",
+                   "por favor", "pode", "qual", "como", "quando", "onde", "quanto", "custa",
+                   "minha", "meu", "fazem", "tem", "vocês", "voces", "é", "e", "de", "para"];
   const enWords = ["hello", "hi", "good", "thanks", "thank", "need", "want",
-                   "please", "can", "what", "how", "when", "where", "much"];
+                   "please", "can", "what", "how", "when", "where", "much", "the", "you", "is", "do"];
 
-  const lower = text.toLowerCase();
+  const words = new Set(text.toLowerCase().split(/[^a-zà-ú]+/).filter(Boolean));
+  const has = w => (w.includes(" ") ? text.toLowerCase().includes(w) : words.has(w));
 
-  let ptScore = ptWords.filter(w => lower.includes(w)).length;
-  let enScore = enWords.filter(w => lower.includes(w)).length;
+  const ptScore = ptWords.filter(has).length;
+  const enScore = enWords.filter(has).length;
 
   if (enScore > ptScore) return "en";
   return config.defaultLanguage; // padrão: pt
 }
 
 // -------------------------------------------------------
-// Recupera ou cria histórico de conversa do usuário
+// Recupera o histórico do cliente (vazio se passaram 24 h)
 // -------------------------------------------------------
 function getHistory(userId) {
-  if (!conversationMemory.has(userId)) {
-    conversationMemory.set(userId, []);
+  const entry = conversationMemory.get(userId);
+  if (entry && Date.now() - entry.updatedAt < MEMORY_TTL_MS) return entry.messages;
+
+  // Limpeza ocasional de conversas antigas
+  if (conversationMemory.size > 2000) {
+    for (const [id, e] of conversationMemory) {
+      if (Date.now() - e.updatedAt >= MEMORY_TTL_MS) conversationMemory.delete(id);
+    }
   }
-  return conversationMemory.get(userId);
+  const fresh = { messages: [], updatedAt: Date.now() };
+  conversationMemory.set(userId, fresh);
+  return fresh.messages;
 }
 
 // -------------------------------------------------------
@@ -111,12 +141,14 @@ function getHistory(userId) {
 function addToHistory(userId, role, content) {
   const history = getHistory(userId);
   history.push({ role, content });
+  conversationMemory.get(userId).updatedAt = Date.now();
 
   // Mantém somente as últimas MAX_HISTORY mensagens
-  // Remove sempre aos pares (user + assistant) para não quebrar o contexto
   while (history.length > MAX_HISTORY) {
-    history.splice(0, 2);
+    history.shift();
   }
+  // A conversa enviada à OpenAI começa sempre por uma mensagem do cliente
+  while (history.length && history[0].role !== "user") history.shift();
 }
 
 // -------------------------------------------------------
@@ -139,7 +171,7 @@ function getLastMessage(userId) {
 // -------------------------------------------------------
 // Função principal: envia mensagem para OpenAI e retorna resposta
 // -------------------------------------------------------
-async function getAIResponse(userId, userMessage) {
+async function getAIResponse(userId, userMessage, context = {}) {
   // Verifica se OpenAI está configurado
   // Sem IA devolve null: o controller responde com o FAQ
   if (!openai || Date.now() < aiPausedUntil) return null;
@@ -147,7 +179,7 @@ async function getAIResponse(userId, userMessage) {
   try {
     // Detecta idioma e escolhe prompt adequado
     const lang = detectLanguage(userMessage);
-    const systemPrompt = lang === "en" ? SYSTEM_PROMPT_EN : SYSTEM_PROMPT_PT;
+    const systemPrompt = buildSystemPrompt(lang, context);
 
     // Adiciona mensagem do usuário ao histórico
     addToHistory(userId, "user", userMessage);
@@ -201,8 +233,32 @@ async function getAIResponse(userId, userMessage) {
   }
 }
 
+// -------------------------------------------------------
+// Transcreve um áudio do WhatsApp (ogg/opus) com o Whisper.
+// Devolve o texto, ou null sem IA / em caso de erro.
+// -------------------------------------------------------
+async function transcribeAudio(buffer, mimeType = "audio/ogg") {
+  if (!openai || Date.now() < aiPausedUntil) return null;
+  try {
+    const ext = mimeType.includes("mpeg") ? "mp3" : mimeType.includes("mp4") ? "m4a" : "ogg";
+    const result = await openai.audio.transcriptions.create({
+      file: await toFile(buffer, `audio.${ext}`, { type: mimeType.split(";")[0] }),
+      model: "whisper-1",
+      language: "pt",
+    });
+    return result.text?.trim() || null;
+  } catch (err) {
+    logger.error("Erro ao transcrever áudio", err);
+    if (err.type === "insufficient_quota" || err.code === "insufficient_quota") {
+      aiPausedUntil = Date.now() + 10 * 60 * 1000;
+    }
+    return null;
+  }
+}
+
 module.exports = {
   getAIResponse,
+  transcribeAudio,
   addToHistory,
   clearMemory,
   getLastMessage,

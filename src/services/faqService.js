@@ -2,10 +2,11 @@
 // services/faqService.js
 // Responsável por buscar respostas na base de FAQ (faq.json).
 //
-// Estratégia de matching em 3 camadas:
+// Estratégia de matching em 4 camadas:
 //  1. Correspondência exata (chave = mensagem inteira)
 //  2. Correspondência parcial (chave contida na mensagem)
 //  3. Correspondência por sinônimos embutida nas chaves do JSON
+//  4. Erros de escrita: palavra a 1 letra da chave (2 nas palavras longas)
 // ============================================================
 
 const path = require("path");
@@ -75,7 +76,37 @@ function findAnswer(message) {
     }
   }
 
+  // --- Camada 4: erros de escrita ("cordolets", "sobrancelas") ---
+  for (const word of words) {
+    if (word.length < 5) continue;
+    const maxDist = word.length >= 8 ? 2 : 1;
+    for (const [key, answer] of Object.entries(faqData)) {
+      const normalizedKey = normalize(key);
+      if (key.startsWith("menu_") || normalizedKey.includes(" ") || normalizedKey.length < 5) continue;
+      if (Math.abs(normalizedKey.length - word.length) > maxDist) continue;
+      if (levenshtein(word, normalizedKey) <= maxDist) {
+        logger.debug("FAQ match (aproximado)", { word, key });
+        return answer;
+      }
+    }
+  }
+
   return null; // Nenhuma correspondência encontrada
+}
+
+// -------------------------------------------------------
+// Distância de edição entre duas palavras (letras a trocar/pôr/tirar)
+// -------------------------------------------------------
+function levenshtein(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) {
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    }
+    prev = cur;
+  }
+  return prev[b.length];
 }
 
 // -------------------------------------------------------
