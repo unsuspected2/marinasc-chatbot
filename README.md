@@ -7,8 +7,8 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
   localização e marcações a partir de `src/data/faq.json`. O que não estiver no FAQ vai para a OpenAI,
   que só pode usar a informação do salão e nunca confirma marcações sozinha.
 - **Site** (`site/`): página estática com serviços e preços, galeria de trabalhos, horário, mapa e
-  botão "Marcar pelo WhatsApp" (946 397 096). O servidor do bot também a serve em `/`, mas pode ser
-  publicada sozinha no Cloudflare Pages (pasta `site/`, sem comando de build).
+  botão "Marcar pelo WhatsApp" (946 397 096). O servidor do bot também a serve em `/`, mas está
+  publicada sozinha no Cloudflare Workers: https://marinasc.marinasc-chatbot.workers.dev/
 
 ## Estrutura
 
@@ -44,6 +44,16 @@ Os preços estão em `src/data/faq.json`. As entradas `menu_*` são as respostas
 e também alimentam a IA. A ordem das chaves conta: a primeira chave encontrada na mensagem é a resposta,
 por isso as mais específicas (ex.: "cordoletes com cachos") vêm antes das gerais ("cordoletes").
 Lembre-se de actualizar também `site/index.html`.
+
+## Publicar o site
+
+O `wrangler.jsonc` serve a pasta `site/` no Worker `marinasc`. Depois de alterar o site:
+
+```bash
+npx wrangler login            # só na primeira vez
+npm run preview               # ver localmente antes de publicar
+npm run deploy                # publica a nova versão
+```
 
 ## Ligar ao WhatsApp
 
