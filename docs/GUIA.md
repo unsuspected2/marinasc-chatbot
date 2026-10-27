@@ -90,9 +90,12 @@ Vai por esta ordem:
    ```
    - `Status: 401` ou `Invalid OAuth access token` → o token da Meta deixou de valer. Gera um novo
      (Utilizadores do sistema, ver `docs/LIGAR-WHATSAPP.md`, passo 4), põe-no no `.env` e reinicia.
-   - `You have no credits remaining` → a conta OpenAI ficou sem saldo. O bot continua a responder com as
-     respostas prontas; para voltar a conversa natural e os áudios, carrega créditos em
-     https://platform.openai.com/settings/organization/billing/
+   - `Groq: sem créditos ou limite atingido` → passou o limite gratuito do Groq (cerca de 1.000 conversas
+     com IA por dia). O bot continua com as respostas prontas e tenta a IA outra vez 10 minutos depois;
+     o limite renova-se sozinho no dia seguinte. Se acontecer todos os dias, ver os limites em
+     https://console.groq.com/settings/limits
+   - `Status: 401` com `groq` → a chave do Groq foi apagada: cria outra em https://console.groq.com/keys,
+     põe-na em `GROQ_API_KEY` no `.env` e reinicia.
    - `ETIMEDOUT` / `ENETUNREACH` → sem internet no PC.
    - Não aparece nada quando mandas uma mensagem → o problema está antes do bot (passo 4).
 4. **O túnel está ligado?** Abre no browser o endereço do bot com `/health` no fim

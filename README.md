@@ -4,7 +4,7 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
 (Cabeleireiro · Manicure · Spa), Centralidade do Kilamba, Edifício C19, Apt. 41, Luanda.
 
 - **Chatbot** (`src/`): Node.js + Express + WhatsApp Cloud API (Meta). Menu com lista e botões
-  interactivos, conversa natural com a OpenAI (só com a informação do salão, nunca inventa preços),
+  interactivos, conversa natural com IA gratuita no Groq (Llama 3.3 70B; só com a informação do salão, nunca inventa preços),
   áudios transcritos com o Whisper, pré-marcações guiadas que seguem para a equipa no 946 397 096,
   promoções e comandos da equipa (`/stats`, `/promo`, `/pausa`, `/retomar`). Sem IA, responde com
   `src/data/faq.json`.
@@ -24,7 +24,7 @@ src/
 ├── controllers/messageController.js ← encaminhamento das mensagens (menu, marcação, IA, FAQ)
 ├── services/
 │   ├── whatsappService.js     ← envio pela Graph API (texto, botões, listas, media)
-│   ├── aiService.js           ← OpenAI (persona, memória de 24 h) e Whisper
+│   ├── aiService.js           ← IA: Groq ou OpenAI (persona, memória de 24 h) e Whisper
 │   ├── faqService.js          ← respostas prontas, tolerantes a erros de escrita
 │   ├── bookingService.js      ← pré-marcação: serviço, dia, hora, nome → link do 946
 │   ├── promoService.js        ← promoções activas

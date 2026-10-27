@@ -1,12 +1,12 @@
 // ============================================================
 // services/aiService.js
-// Integração com a API da OpenAI como fallback inteligente.
+// Conversa com IA (Groq gratuito ou OpenAI; mesma API) e transcrição de áudios.
 //
 // Recursos implementados:
 //  - Memória de conversa por cliente (últimas 10 mensagens, 24 h)
 //  - Detecção de idioma (PT / EN)
 //  - Prompt de sistema com a hora de Luanda e se o salão está aberto
-//  - Transcrição de áudios (Whisper)
+//  - Transcrição de áudios (Whisper, no Groq ou na OpenAI)
 //  - Graceful degradation: se a API falhar, devolve null e o controller usa o FAQ
 // ============================================================
 
@@ -17,16 +17,16 @@ const logger = require("../utils/logger");
 const horario = require("../utils/horario");
 
 // -------------------------------------------------------
-// Inicialização do cliente OpenAI
+// Inicialização do cliente (o SDK da OpenAI também fala com o Groq)
 // -------------------------------------------------------
 let openai = null;
 
-if (config.openaiApiKey) {
+if (config.ai.apiKey) {
   // Poucas tentativas: o cliente está à espera da resposta no WhatsApp
-  openai = new OpenAI({ apiKey: config.openaiApiKey, maxRetries: 1, timeout: 15000 });
-  logger.info("OpenAI inicializado com sucesso.");
+  openai = new OpenAI({ apiKey: config.ai.apiKey, baseURL: config.ai.baseURL, maxRetries: 1, timeout: 15000 });
+  logger.info(`IA: ${config.ai.provider} (${config.ai.model}, áudios com ${config.ai.transcribeModel}).`);
 } else {
-  logger.warn("OPENAI_API_KEY não definida. Fallback de IA desabilitado.");
+  logger.warn("Sem GROQ_API_KEY nem OPENAI_API_KEY: o bot responde só com o FAQ.");
 }
 
 // -------------------------------------------------------
@@ -35,7 +35,7 @@ if (config.openaiApiKey) {
 // sem conversa. Fica só em memória (perde-se se o bot reiniciar).
 // -------------------------------------------------------
 const conversationMemory = new Map();
-let aiPausedUntil = 0; // quando a OpenAI fica sem créditos, o bot usa só o FAQ por uns minutos
+let aiPausedUntil = 0; // sem créditos ou limite diário esgotado: o bot usa só o FAQ por uns minutos
 const MAX_HISTORY = 10; // mensagens (cliente + bot) guardadas por cliente
 const MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -169,10 +169,20 @@ function getLastMessage(userId) {
 }
 
 // -------------------------------------------------------
-// Função principal: envia mensagem para OpenAI e retorna resposta
+// Sem créditos (OpenAI) ou limite gratuito esgotado (Groq, 429):
+// não vale a pena tentar a cada mensagem
+// -------------------------------------------------------
+function pauseIfOutOfQuota(err) {
+  if (err.type === "insufficient_quota" || err.code === "insufficient_quota" || err.status === 429) {
+    aiPausedUntil = Date.now() + 10 * 60 * 1000;
+    logger.warn(`${config.ai.provider}: sem créditos ou limite atingido; IA em pausa durante 10 minutos.`);
+  }
+}
+
+// -------------------------------------------------------
+// Função principal: envia a mensagem à IA e devolve a resposta
 // -------------------------------------------------------
 async function getAIResponse(userId, userMessage, context = {}) {
-  // Verifica se OpenAI está configurado
   // Sem IA devolve null: o controller responde com o FAQ
   if (!openai || Date.now() < aiPausedUntil) return null;
 
@@ -190,15 +200,14 @@ async function getAIResponse(userId, userMessage, context = {}) {
       ...getHistory(userId),
     ];
 
-    logger.debug("Enviando para OpenAI", {
+    logger.debug("Enviando para a IA", {
       userId,
       lang,
       historyLength: messages.length - 1,
     });
 
-    // Chamada à API da OpenAI
     const completion = await openai.chat.completions.create({
-      model: config.openaiModel,
+      model: config.ai.model,
       messages,
       max_tokens: 300,           // resposta curta e objetiva
       temperature: 0.5,          // natural, mas fiel à tabela de preços
@@ -209,17 +218,12 @@ async function getAIResponse(userId, userMessage, context = {}) {
     // Salva resposta do assistente no histórico
     addToHistory(userId, "assistant", assistantMessage);
 
-    logger.debug("OpenAI respondeu", { userId, tokens: completion.usage });
+    logger.debug("IA respondeu", { userId, tokens: completion.usage });
 
     return assistantMessage;
   } catch (err) {
-    logger.error("Erro ao chamar OpenAI", err);
-
-    // Sem créditos: não vale a pena tentar a cada mensagem
-    if (err.type === "insufficient_quota" || err.code === "insufficient_quota") {
-      aiPausedUntil = Date.now() + 10 * 60 * 1000;
-      logger.warn("OpenAI sem créditos — IA em pausa durante 10 minutos.");
-    }
+    logger.error(`Erro ao chamar a IA (${config.ai.provider})`, err);
+    pauseIfOutOfQuota(err);
 
     // Remove a última mensagem do usuário se a chamada falhou
     // (evita contexto corrompido na próxima tentativa)
@@ -243,15 +247,13 @@ async function transcribeAudio(buffer, mimeType = "audio/ogg") {
     const ext = mimeType.includes("mpeg") ? "mp3" : mimeType.includes("mp4") ? "m4a" : "ogg";
     const result = await openai.audio.transcriptions.create({
       file: await toFile(buffer, `audio.${ext}`, { type: mimeType.split(";")[0] }),
-      model: "whisper-1",
+      model: config.ai.transcribeModel,
       language: "pt",
     });
     return result.text?.trim() || null;
   } catch (err) {
     logger.error("Erro ao transcrever áudio", err);
-    if (err.type === "insufficient_quota" || err.code === "insufficient_quota") {
-      aiPausedUntil = Date.now() + 10 * 60 * 1000;
-    }
+    pauseIfOutOfQuota(err);
     return null;
   }
 }

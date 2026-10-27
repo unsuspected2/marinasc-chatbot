@@ -46,7 +46,7 @@ Preenche no `.env`:
 - `WHATSAPP_TOKEN` = o token do passo 4
 - `PHONE_NUMBER_ID` = o ID do passo 3
 - `VERIFY_TOKEN` = uma palavra secreta inventada por ti (ex.: marinasc-2026-xyz)
-- `OPENAI_API_KEY` = a tua chave da OpenAI (opcional; sem ela o bot responde só com o FAQ)
+- `GROQ_API_KEY` = chave gratuita do Groq, em https://console.groq.com/keys (opcional; sem ela o bot responde só com o FAQ)
 
 Testa: `npm run simular` e depois `npm start`. Em http://localhost:3100/health deve aparecer `"status":"ok"`.
 

@@ -46,7 +46,7 @@ function writeToFile(line) {
 // -------------------------------------------------------
 // Tapa segredos: os valores do .env e formatos conhecidos de tokens
 // -------------------------------------------------------
-const SECRETS = [config.whatsappToken, config.verifyToken, config.openaiApiKey]
+const SECRETS = [config.whatsappToken, config.verifyToken, config.ai.apiKey]
   .filter(s => s && s.length >= 8);
 
 function redact(text) {
@@ -55,7 +55,7 @@ function redact(text) {
   return out
     .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [oculto]")
     .replace(/\bEAA[A-Za-z0-9]{20,}/g, "[oculto]")
-    .replace(/\bsk-[A-Za-z0-9_-]{20,}/g, "[oculto]");
+    .replace(/\b(sk|gsk)_?-?[A-Za-z0-9_-]{20,}/g, "[oculto]");
 }
 
 // Escreve no terminal e no ficheiro
