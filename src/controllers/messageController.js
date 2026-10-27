@@ -42,7 +42,7 @@ const KEYWORD_FLOWS = {
 // -------------------------------------------------------
 const MENUS = {
   pt: {
-    title: "💖 Olá! Bem-vinda ao *MARINASC Salão de Beleza*\nBeleza · Cuidado · Confiança\n\nComo podemos ajudar?",
+    title: "💖 Olá! Boas-vindas ao *MARINASC Salão de Beleza*\nBeleza · Cuidado · Confiança\n\nComo podemos ajudar?",
     options: [
       "💇🏾‍♀️ Tranças e twists (preços)",
       "💅🏾 Unhas (preços)",
@@ -95,7 +95,7 @@ const COMMANDS = {
 async function handleStart(to, name, lang) {
   const greeting = lang === "en"
     ? `💖 Welcome to MARINASC, ${name}! Here are the options:`
-    : `💖 Olá, ${name}! Bem-vinda ao MARINASC Salão de Beleza. Veja as opções:`;
+    : `💖 Olá, ${name}! Boas-vindas ao MARINASC Salão de Beleza. Veja as opções:`;
 
   await sendMenu(to, lang, greeting);
 }
@@ -250,7 +250,7 @@ async function handleIncomingMessage(req, res) {
     // ("oi, quanto custa bobes?" segue para o FAQ em vez de mostrar o menu)
     if (containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers) && !faqService.findAnswer(text)) {
       logger.info("Trigger de menu detectado", { from, text });
-      await sendMenu(from, lang, lang === "en" ? `💖 Hello, ${name}! How can we help?` : `💖 Olá, ${name}! Bem-vinda ao MARINASC. Como podemos ajudar?`);
+      await sendMenu(from, lang, lang === "en" ? `💖 Hello, ${name}! How can we help?` : `💖 Olá, ${name}! Boas-vindas ao MARINASC. Como podemos ajudar?`);
       return;
     }
 
