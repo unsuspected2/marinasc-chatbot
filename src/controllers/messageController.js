@@ -528,7 +528,7 @@ async function handleIncomingMessage(req, res) {
     logger.incoming(from, type === "text" ? text : `[${type}] ${text}`.trim());
 
     // 3. Marca como lida e mostra "a escrever..." enquanto o bot pensa
-    await whatsappService.markAsRead(messageId);
+    await whatsappService.markAsRead(messageId, from);
 
     // 4. Comandos da equipa (só do 946 397 096 / ADMIN_NUMBERS)
     if (type === "text" && text.startsWith("/")) {

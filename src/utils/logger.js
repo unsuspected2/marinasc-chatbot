@@ -47,7 +47,7 @@ function writeToFile(line) {
 // -------------------------------------------------------
 // Tapa segredos: os valores do .env e formatos conhecidos de tokens
 // -------------------------------------------------------
-const SECRETS = [config.whatsappToken, config.verifyToken, config.ai.apiKey]
+const SECRETS = [config.whatsappToken, config.verifyToken, config.ai.apiKey, config.instagramToken]
   .filter(s => s && s.length >= 8);
 
 function redact(text) {

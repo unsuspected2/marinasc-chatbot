@@ -13,6 +13,8 @@
 
 const config = require("../config/env");
 const logger = require("../utils/logger");
+// Clientes do Instagram ("ig:…") são atendidos pelo mesmo código
+const instagram = require("./instagramService");
 
 // -------------------------------------------------------
 // Pedido à Graph API com fetch (funciona no PC e na Cloudflare).
@@ -70,6 +72,7 @@ async function postWithRetry(url, payload, attempts = 3) {
 // Envia mensagem de texto simples para um número
 // -------------------------------------------------------
 async function sendTextMessage(to, text) {
+  if (instagram.isInstagram(to)) return instagram.sendText(to, text);
   try {
     const payload = {
       messaging_product: "whatsapp",
@@ -115,7 +118,8 @@ async function sendMenuMessage(to, title, options) {
 // Marca uma mensagem recebida como lida (✓✓ azul) e mostra
 // "a escrever..." ao cliente até a resposta seguir (máx. 25 s).
 // -------------------------------------------------------
-async function markAsRead(messageId) {
+async function markAsRead(messageId, from) {
+  if (instagram.isInstagram(from)) return instagram.markSeen(from);
   try {
     await graphApi.post(`/${config.phoneNumberId}/messages`, {
       messaging_product: "whatsapp",
@@ -141,6 +145,7 @@ async function markAsRead(messageId) {
 //  mediaId: id do áudio/foto para descarregar
 // -------------------------------------------------------
 function parseIncomingMessage(body) {
+  if (body?.object === "instagram") return instagram.parse(body);
   try {
     const value = body?.entry?.[0]?.changes?.[0]?.value;
 
@@ -215,6 +220,7 @@ const cut = (t, n) => (t.length > n ? t.slice(0, n - 1) + "…" : t);
 // Até 3 botões de resposta. buttons: [{ id, title }]
 // -------------------------------------------------------
 async function sendButtons(to, bodyText, buttons, fallbackText = bodyText) {
+  if (instagram.isInstagram(to)) return instagram.sendText(to, bodyText, buttons);
   return sendInteractive(to, {
     type: "button",
     body: { text: cut(bodyText, 1024) },
@@ -228,6 +234,7 @@ async function sendButtons(to, bodyText, buttons, fallbackText = bodyText) {
 // Lista de opções (até 10). sections: [{ title, rows: [{ id, title, description }] }]
 // -------------------------------------------------------
 async function sendList(to, { header, body, footer, button }, sections, fallbackText) {
+  if (instagram.isInstagram(to)) return instagram.sendText(to, body, sections.flatMap(s => s.rows));
   return sendInteractive(to, {
     type: "list",
     ...(header && { header: { type: "text", text: cut(header, 60) } }),
@@ -251,6 +258,7 @@ async function sendList(to, { header, body, footer, button }, sections, fallback
 // Botão que abre um link (ex.: WhatsApp da equipa com a marcação)
 // -------------------------------------------------------
 async function sendLinkButton(to, bodyText, displayText, url) {
+  if (instagram.isInstagram(to)) return instagram.sendText(to, `${bodyText}\n\n👉 ${displayText}: ${url}`);
   return sendInteractive(to, {
     type: "cta_url",
     body: { text: cut(bodyText, 1024) },
@@ -262,6 +270,7 @@ async function sendLinkButton(to, bodyText, displayText, url) {
 // Descarrega um áudio/foto recebido (máx. 16 MB)
 // -------------------------------------------------------
 async function downloadMedia(mediaId) {
+  if (/^https:\/\/[^/]*(cdninstagram|fbcdn|lookaside)/.test(mediaId || "")) return instagram.downloadMedia(mediaId);
   const { data: info } = await graphApi.get(`/${mediaId}`);
   if (info.file_size > 16 * 1024 * 1024) throw new Error(`Ficheiro grande demais (${info.file_size} bytes)`);
   const file = await graphApi.get(info.url, { timeout: 30000, raw: true });

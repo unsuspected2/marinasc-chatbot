@@ -12,6 +12,7 @@
 //   (áudio) quero marcar…     → enviar um áudio; o texto faz de transcrição
 //   (equipa) /stats           → mensagem enviada do 946 397 096 (comandos de admin)
 //   (cliente2) …              → mensagem de outra cliente (para testar vagas ocupadas)
+//   (instagram) …             → mensagem directa do Instagram (respostas rápidas em vez de botões)
 //   {ultimo}                  → código da última marcação criada (ex.: /confirmar {ultimo})
 //
 // As marcações e estatísticas da simulação ficam numa pasta temporária,
@@ -100,6 +101,9 @@ const EXEMPLOS = [
   "Ainda está aí?",
   "(equipa) /retomar",
   "/stats",
+  // Instagram: o mesmo bot, com respostas rápidas
+  "(instagram) qt custa as tranças nagô?",
+  "(instagram) [btn_marcar]",
 ];
 
 let contador = 0;
@@ -131,6 +135,13 @@ function message(text, id) {
 }
 
 function payload(text, id = `simulado-${++contador}`) {
+  if (text.startsWith("(instagram) ")) {
+    text = text.slice("(instagram) ".length);
+    current = "ig:1789000000";
+    const m = /^\[(\w+)\]$/.exec(text);
+    return { object: "instagram", entry: [{ id: "salao", messaging: [{ sender: { id: "1789000000" }, timestamp: Date.now(),
+      message: { mid: id, text, ...(m && { quick_reply: { payload: m[1] } }) } }] }] };
+  }
   return {
     entry: [{
       changes: [{

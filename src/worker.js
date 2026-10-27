@@ -61,7 +61,7 @@ export class Bot extends DurableObject {
       return Response.json({ ...store.readJson("ultima-mensagem.json", {}), mensagensHoje: dia?.mensagens || 0 });
     }
     const body = await request.json();
-    if (body?.entry?.[0]?.changes?.[0]?.value?.messages) {
+    if (body?.entry?.[0]?.changes?.[0]?.value?.messages || body?.entry?.[0]?.messaging) {
       store.writeJson("ultima-mensagem.json", { ultimaMensagem: new Date().toISOString() });
     }
     try {
@@ -85,7 +85,11 @@ export default {
 
     if (url.pathname === "/webhook" && request.method === "POST") {
       const body = await request.text();
-      if (!(await validSignature(body, request.headers.get("x-hub-signature-256"), env.APP_SECRET))) {
+      // A app do WhatsApp e a do Instagram têm segredos diferentes: basta um bater certo
+      const signature = request.headers.get("x-hub-signature-256");
+      const secrets = [env.APP_SECRET, env.INSTAGRAM_APP_SECRET].filter(Boolean);
+      const valid = !secrets.length || (await Promise.all(secrets.map(s => validSignature(body, signature, s)))).some(Boolean);
+      if (!valid) {
         logger.warn("POST /webhook sem assinatura válida da Meta — ignorado");
         return new Response("Forbidden", { status: 403 });
       }

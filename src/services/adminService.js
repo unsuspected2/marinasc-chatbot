@@ -53,7 +53,7 @@ async function tellClient(m, text) {
     await whatsappService.sendTextMessage(m.cliente, text);
     return "\nO cliente foi avisado. ✔️";
   } catch {
-    return `\n⚠️ Não consegui avisar o cliente (a WhatsApp só deixa responder até 24 h depois da última mensagem dele). Avise-o pelo 946: wa.me/${m.cliente}`;
+    return `\n⚠️ Não consegui avisar o cliente (a WhatsApp só deixa responder até 24 h depois da última mensagem dele). ${m.cliente.startsWith("ig:") ? "Responda-lhe no Instagram do salão." : `Avise-o pelo 946: wa.me/${m.cliente}`}`;
   }
 }
 

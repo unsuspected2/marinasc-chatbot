@@ -65,6 +65,10 @@ const config = {
   // Sem nenhuma chave o bot responde só com o FAQ.
   ai: aiConfig(),
 
+  // --- Instagram (mensagens directas) ---
+  // Token da conta profissional do Instagram; sem ele as DMs são ignoradas
+  instagramToken: (process.env.INSTAGRAM_TOKEN || "").trim(),
+
   // --- Admin ---
   // Números que podem usar /stats, /promo, /pausa e /retomar (separados por vírgula)
   adminNumbers: (process.env.ADMIN_NUMBERS || "244946397096").split(",").map(n => n.replace(/\D/g, "")).filter(Boolean),

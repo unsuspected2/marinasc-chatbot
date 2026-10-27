@@ -245,7 +245,7 @@ const ESTADO_EMOJI = { pendente: "⏳", confirmada: "✅", recusada: "❌", canc
 function describe(m, { withClient = false } = {}) {
   const fim = horaLabel(m.inicio + m.duracao);
   return `${ESTADO_EMOJI[m.estado] || "⏳"} *#${m.codigo}* ${m.servico}, ${dayText(m.dia)}, ${horaLabel(m.inicio)}–${fim}`
-    + (withClient ? `\n   ${m.nome}${m.origem === "equipa" ? " (marcada pela equipa)" : ` · wa.me/${m.cliente}`}` : "");
+    + (withClient ? `\n   ${m.nome}${m.origem === "equipa" ? " (marcada pela equipa)" : m.cliente.startsWith("ig:") ? " · pelo Instagram" : ` · wa.me/${m.cliente}`}` : "");
 }
 
 module.exports = {
