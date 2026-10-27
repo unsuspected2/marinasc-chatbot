@@ -45,7 +45,7 @@ const conversationMemory = store.persistentMap("memoria.json", MEMORY_TTL_MS);
 // -------------------------------------------------------
 // Informação do salão: vem do faq.json para não haver dois sítios com preços
 const faq = require("../data/faq.json");
-const SALON_INFO = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_spa", "menu_barbearia", "menu_horario"]
+const SALON_INFO = ["sobre", "menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_spa", "menu_barbearia", "menu_horario"]
   .map(k => faq[k].replace(/\*/g, ""))
   .join("\n\n");
 
