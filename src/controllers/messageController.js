@@ -6,9 +6,9 @@
 //  1. Parse do payload recebido
 //  2. Marcar mensagem como lida
 //  3. Verificar comandos especiais (/start, /help, /menu)
-//  4. Buscar resposta no FAQ
-//  5. Verificar keywords para fluxos especiais
-//  6. Fallback: enviar para OpenAI
+//  4. Números do menu (1 a 7) e cumprimentos simples
+//  5. Conversa livre: OpenAI, com o histórico da conversa
+//  6. Sem IA: keywords de fluxos especiais e FAQ
 //  7. Enviar resposta ao usuário
 // ============================================================
 
@@ -34,7 +34,8 @@ const KEYWORD_FLOWS = {
 
   // Palavras que indicam reclamação
   complaintTriggers: ["reclamação", "reclamacao", "complaint", "problema",
-                       "errado", "errada", "incorreto", "insatisfeito", "insatisfeita"],
+                       "errado", "errada", "incorreto", "insatisfeito", "insatisfeita",
+                       "chateado", "chateada", "mal atendido", "mal atendida"],
 };
 
 // -------------------------------------------------------
@@ -139,6 +140,7 @@ async function sendMenu(to, lang, customTitle) {
   const title = customTitle || menu.title;
   const fullText = `${title}\n\n${menu.options.map((o, i) => `${i + 1}. ${o}`).join("\n")}${menu.footer}`;
   await whatsappService.sendTextMessage(to, fullText);
+  aiService.addToHistory(to, "assistant", fullText);
 }
 
 // -------------------------------------------------------
@@ -158,19 +160,15 @@ async function handleMenuSelection(to, number, lang) {
 
   const key = map[index];
 
-  if (key === null) {
-    // Opção 7: falar com atendente
-    const text = lang === "en"
-      ? TEAM_CONTACT.en
-      : TEAM_CONTACT.pt;
-    await whatsappService.sendTextMessage(to, text);
-    return true;
-  }
-
-  // Busca no FAQ pela chave do menu
-  const answer = faqService.findAnswer(key);
+  // Opção 7: falar com atendente; as outras vêm do FAQ
+  const answer = key === null
+    ? (lang === "en" ? TEAM_CONTACT.en : TEAM_CONTACT.pt)
+    : faqService.findAnswer(key);
   if (answer) {
     await whatsappService.sendTextMessage(to, answer);
+    // A IA fica a saber o que a pessoa escolheu, para a conversa continuar daí
+    aiService.addToHistory(to, "user", number);
+    aiService.addToHistory(to, "assistant", answer);
     return true;
   }
 
@@ -246,27 +244,35 @@ async function handleIncomingMessage(req, res) {
       if (handled) return;
     }
 
-    // C. Keywords que disparam o menu principal
-    // ("oi, quanto custa bobes?" segue para o FAQ em vez de mostrar o menu)
-    if (containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers) && !faqService.findAnswer(text)) {
+    // C. Só um cumprimento ("olá", "bom dia", "menu") → menu principal.
+    // Mensagens com mais conteúdo ("oi, quanto custa bobes?") seguem para a IA.
+    const isGreetingOnly = containsTrigger(normalizedText, KEYWORD_FLOWS.menuTriggers)
+      && normalizedText.split(/\s+/).length <= 4;
+    if (isGreetingOnly) {
       logger.info("Trigger de menu detectado", { from, text });
       await sendMenu(from, lang, lang === "en" ? `💖 Hello, ${name}! How can we help?` : `💖 Olá, ${name}! Boas-vindas ao MARINASC. Como podemos ajudar?`);
       return;
     }
 
-    // D. Keywords de solicitação de atendimento humano
-    if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
-      logger.info("Solicitação de humano detectada", { from });
-      const humanText = lang === "en"
-        ? TEAM_CONTACT.en
-        : TEAM_CONTACT.pt;
-      await whatsappService.sendTextMessage(from, humanText);
+    // D. Conversa livre: a IA responde com o contexto da conversa
+    const aiResponse = await aiService.getAIResponse(from, text);
+    if (aiResponse) {
+      logger.info("Resposta da IA", { from });
+      await whatsappService.sendTextMessage(from, aiResponse);
       return;
     }
 
-    // E. Keywords de reclamação
+    // Sem IA (sem chave ou erro): respostas prontas por palavra-chave
+    logger.info("IA indisponível — a usar o FAQ", { from });
+
+    // E. Keywords de solicitação de atendimento humano
+    if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
+      await whatsappService.sendTextMessage(from, lang === "en" ? TEAM_CONTACT.en : TEAM_CONTACT.pt);
+      return;
+    }
+
+    // F. Keywords de reclamação
     if (containsTrigger(normalizedText, KEYWORD_FLOWS.complaintTriggers)) {
-      logger.info("Reclamação detectada", { from });
       const complaintText = lang === "en"
         ? `😔 We're sorry about that.\n\nPlease tell the salon manager what happened on WhatsApp *+244 946 397 096*: https://wa.me/244946397096\nWe'll handle it with priority. 💖`
         : `😔 Lamentamos muito pelo sucedido.\n\nConte à responsável do salão o que aconteceu, com o dia e o serviço, no WhatsApp *946 397 096*: https://wa.me/244946397096\nVamos tratar do seu caso com prioridade. 💖`;
@@ -274,18 +280,11 @@ async function handleIncomingMessage(req, res) {
       return;
     }
 
-    // F. Busca no FAQ
+    // G. Busca no FAQ
     const faqAnswer = faqService.findAnswer(text);
-    if (faqAnswer) {
-      logger.info("Resposta encontrada no FAQ", { from });
-      await whatsappService.sendTextMessage(from, faqAnswer);
-      return;
-    }
-
-    // G. Fallback: OpenAI
-    logger.info("Sem match no FAQ — enviando para OpenAI", { from });
-    const aiResponse = await aiService.getAIResponse(from, text);
-    await whatsappService.sendTextMessage(from, aiResponse);
+    await whatsappService.sendTextMessage(from, faqAnswer || (lang === "en"
+      ? "Thanks for your message! 💖 Type *menu* to see the options, or talk to our team on WhatsApp +244 946 397 096: https://wa.me/244946397096"
+      : "Obrigado pela mensagem! 💖 Escreva *menu* para ver as opções, ou fale com a nossa equipa no WhatsApp 946 397 096: https://wa.me/244946397096"));
 
   } catch (err) {
     logger.error("Erro crítico ao processar mensagem", err);

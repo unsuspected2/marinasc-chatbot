@@ -19,7 +19,8 @@ const logger = require("../utils/logger");
 let openai = null;
 
 if (config.openaiApiKey) {
-  openai = new OpenAI({ apiKey: config.openaiApiKey });
+  // Poucas tentativas: o cliente está à espera da resposta no WhatsApp
+  openai = new OpenAI({ apiKey: config.openaiApiKey, maxRetries: 1, timeout: 15000 });
   logger.info("OpenAI inicializado com sucesso.");
 } else {
   logger.warn("OPENAI_API_KEY não definida. Fallback de IA desabilitado.");
@@ -31,6 +32,7 @@ if (config.openaiApiKey) {
 // Para produção: mova para Redis ou MongoDB com TTL.
 // -------------------------------------------------------
 const conversationMemory = new Map();
+let aiPausedUntil = 0; // quando a OpenAI fica sem créditos, o bot usa só o FAQ por uns minutos
 const MAX_HISTORY = 10; // máximo de pares usuário/assistente na memória
 
 // -------------------------------------------------------
@@ -43,11 +45,24 @@ const SALON_INFO = ["menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "
   .join("\n\n");
 
 const SYSTEM_PROMPT_PT = `És a assistente virtual do MARINASC Salão de Beleza (Cabeleireiro, Manicure e Spa), na Centralidade do Kilamba, Luanda. Lema: Beleza · Cuidado · Confiança.
-Responde sempre em português de Angola, de forma simpática, próxima e curta (no máximo 4 frases), como no WhatsApp.
-Usa só a informação abaixo. Nunca inventes preços, promoções, disponibilidade ou serviços que não estejam na lista.
-Se o serviço estiver "sob consulta" ou não constar, diz que a equipa confirma o valor e pede uma foto do resultado desejado.
-Este número é só do assistente automático. Para marcar, falar com a equipa ou tratar de reclamações, encaminha sempre para o WhatsApp do salão 946 397 096 (https://wa.me/244946397096). Nunca confirmes tu uma marcação.
-Se não souberes a resposta, encaminha para esse WhatsApp.
+
+COMO FALAR
+- Português de Angola, simpático e próximo, como uma recepcionista do salão a escrever no WhatsApp. Trata a pessoa por "você" ou pelo nome.
+- Mensagens curtas: 1 a 4 frases. Responde primeiro ao que perguntaram e depois, se fizer sentido, faz UMA pergunta para avançar a conversa (ex.: "É para si ou para outra pessoa?", "Prefere com ou sem cachos?", "Para que dia estava a pensar?").
+- Lembra-te do que já foi dito na conversa e não repitas listas inteiras de preços. Se a pessoa já disse o serviço, fala só desse serviço.
+- Não uses linguagem de robô nem "digite 1". Podes usar 1 emoji por mensagem, no máximo.
+- Se a mensagem for só um cumprimento, cumprimenta e pergunta em que podes ajudar (tranças, unhas, sobrancelhas, cabelo).
+- Não presumas o género de quem escreve: evita "bem-vinda/obrigada por ter vindo" dirigido à pessoa.
+
+O QUE PODES DIZER
+- Usa só a informação abaixo. Nunca inventes preços, promoções, disponibilidade, duração ou serviços que não estejam na lista.
+- Se o serviço estiver "sob consulta" ou não constar, diz que a equipa confirma o valor e sugere enviar uma foto do resultado desejado.
+
+MARCAÇÕES, RECLAMAÇÕES E FALAR COM UMA PESSOA
+- Nunca confirmes tu uma marcação nem digas que há vaga.
+- Quando a pessoa quiser marcar, ajuda a juntar: serviço, dia e hora preferida. Quando tiveres o serviço (o resto pode faltar), dá o link da equipa já com o pedido escrito, assim: https://wa.me/244946397096?text=<pedido com espaços trocados por %20>, por exemplo https://wa.me/244946397096?text=Ol%C3%A1!%20Quero%20marcar%20cordoletes%20para%20s%C3%A1bado%20de%20manh%C3%A3. Diz que a equipa confirma a vaga.
+- Reclamações ou pedidos para falar com uma pessoa: mostra empatia numa frase e encaminha para a equipa no WhatsApp 946 397 096 (https://wa.me/244946397096).
+- Se não souberes a resposta, encaminha para esse WhatsApp.
 
 INFORMAÇÃO DO SALÃO:
 ${SALON_INFO}`;
@@ -126,11 +141,8 @@ function getLastMessage(userId) {
 // -------------------------------------------------------
 async function getAIResponse(userId, userMessage) {
   // Verifica se OpenAI está configurado
-  if (!openai) {
-    return config.defaultLanguage === "en"
-      ? "I'm sorry, I couldn't process your request right now. Please contact us directly."
-      : "Obrigada pela mensagem! 💖 Para ver as opções escreva *menu*, ou fale com a nossa equipa no WhatsApp 946 397 096: https://wa.me/244946397096";
-  }
+  // Sem IA devolve null: o controller responde com o FAQ
+  if (!openai || Date.now() < aiPausedUntil) return null;
 
   try {
     // Detecta idioma e escolhe prompt adequado
@@ -157,7 +169,7 @@ async function getAIResponse(userId, userMessage) {
       model: config.openaiModel,
       messages,
       max_tokens: 300,           // resposta curta e objetiva
-      temperature: 0.3,          // baixa: respostas fiéis à tabela de preços
+      temperature: 0.5,          // natural, mas fiel à tabela de preços
     });
 
     const assistantMessage = completion.choices[0].message.content.trim();
@@ -171,6 +183,12 @@ async function getAIResponse(userId, userMessage) {
   } catch (err) {
     logger.error("Erro ao chamar OpenAI", err);
 
+    // Sem créditos: não vale a pena tentar a cada mensagem
+    if (err.type === "insufficient_quota" || err.code === "insufficient_quota") {
+      aiPausedUntil = Date.now() + 10 * 60 * 1000;
+      logger.warn("OpenAI sem créditos — IA em pausa durante 10 minutos.");
+    }
+
     // Remove a última mensagem do usuário se a chamada falhou
     // (evita contexto corrompido na próxima tentativa)
     const history = getHistory(userId);
@@ -178,15 +196,14 @@ async function getAIResponse(userId, userMessage) {
       history.pop();
     }
 
-    // Mensagem de fallback amigável
-    return config.defaultLanguage === "en"
-      ? "Sorry, I'm having trouble responding right now. Please try again in a moment or contact us directly. 🙏"
-      : "Obrigada pela mensagem! 💖 Para ver as opções escreva *menu*, ou fale com a nossa equipa no WhatsApp 946 397 096: https://wa.me/244946397096";
+    // O controller responde com o FAQ
+    return null;
   }
 }
 
 module.exports = {
   getAIResponse,
+  addToHistory,
   clearMemory,
   getLastMessage,
   detectLanguage,

@@ -27,6 +27,22 @@ const graphApi = axios.create({
 });
 
 // -------------------------------------------------------
+// POST com novas tentativas quando a rede falha (sem resposta da Meta).
+// Erros com resposta (token, número inválido) não se repetem.
+// -------------------------------------------------------
+async function postWithRetry(url, payload, attempts = 3) {
+  for (let i = 1; ; i++) {
+    try {
+      return await graphApi.post(url, payload);
+    } catch (err) {
+      if (err.response || i >= attempts) throw err;
+      logger.warn(`Rede falhou ao contactar a Meta (tentativa ${i}/${attempts})`, { code: err.code });
+      await new Promise(r => setTimeout(r, 1500 * i));
+    }
+  }
+}
+
+// -------------------------------------------------------
 // Envia mensagem de texto simples para um número
 // -------------------------------------------------------
 async function sendTextMessage(to, text) {
@@ -42,10 +58,7 @@ async function sendTextMessage(to, text) {
       },
     };
 
-    const response = await graphApi.post(
-      `/${config.phoneNumberId}/messages`,
-      payload
-    );
+    const response = await postWithRetry(`/${config.phoneNumberId}/messages`, payload);
 
     logger.outgoing(to, text);
     logger.debug("WhatsApp API response", response.data);
