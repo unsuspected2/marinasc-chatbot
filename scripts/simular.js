@@ -11,6 +11,8 @@
 //   (foto)                    → enviar uma foto
 //   (áudio) quero marcar…     → enviar um áudio; o texto faz de transcrição
 //   (equipa) /stats           → mensagem enviada do 946 397 096 (comandos de admin)
+//   (cliente2) …              → mensagem de outra cliente (para testar vagas ocupadas)
+//   {ultimo}                  → código da última marcação criada (ex.: /confirmar {ultimo})
 //
 // As marcações e estatísticas da simulação ficam numa pasta temporária,
 // não em data/ (as promoções reais são copiadas para lá).
@@ -35,14 +37,16 @@ const whatsappService = require("../src/services/whatsappService");
 const aiService = require("../src/services/aiService");
 
 // Em vez de enviar para a Graph API, mostra a resposta no terminal
-const show = text => console.log(`🤖 ${text.replace(/\n/g, "\n   ")}\n`);
-whatsappService.sendTextMessage = async (_to, text) => show(text);
-whatsappService.sendButtons = async (_to, text, buttons) =>
-  show(`${text}\n${buttons.map(b => `[ ${b.title} ]`).join("  ")}`);
-whatsappService.sendList = async (_to, { body, button }, sections) =>
-  show(`${body}\n[ ${button} ▾ ]\n${sections.map(s => `  ${s.title}:\n${s.rows.map(r => `   • ${r.title} (${r.id})`).join("\n")}`).join("\n")}`);
-whatsappService.sendLinkButton = async (_to, text, label, url) =>
-  show(`${text}\n[ ${label} ↗ ${decodeURIComponent(url)} ]`);
+// (com o destinatário quando não é quem escreveu: aviso à equipa ou a outro cliente)
+let current = null;
+const show = (to, text) => console.log(`🤖${to !== current ? ` → ${to}` : ""} ${text.replace(/\n/g, "\n   ")}\n`);
+whatsappService.sendTextMessage = async (to, text) => show(to, text);
+whatsappService.sendButtons = async (to, text, buttons) =>
+  show(to, `${text}\n${buttons.map(b => `[ ${b.title} ]`).join("  ")}`);
+whatsappService.sendList = async (to, { body, button }, sections) =>
+  show(to, `${body}\n[ ${button} ▾ ]\n${sections.map(s => `  ${s.title}:\n${s.rows.map(r => `   • ${r.title} (${r.id})`).join("\n")}`).join("\n")}`);
+whatsappService.sendLinkButton = async (to, text, label, url) =>
+  show(to, `${text}\n[ ${label} ↗ ${decodeURIComponent(url)} ]`);
 whatsappService.markAsRead = async () => {};
 // Áudio simulado: o "ficheiro" é o próprio texto e a "transcrição" devolve-o
 whatsappService.downloadMedia = async id => ({ buffer: Buffer.from(id), mimeType: "audio/ogg" });
@@ -68,6 +72,24 @@ const EXEMPLOS = [
   // Marcação já com serviço e dia na mensagem; cancelada a meio
   "quero marcar unhas de gel para sábado",
   "cancelar",
+  // Agenda: a mesma hora para várias clientes (tranças: 2 profissionais)
+  "quero marcar cordoletes para sábado às 10h",
+  "[book_nome_perfil]",
+  "(cliente2) quero marcar bobes sábado às 10h",
+  "(cliente2) [book_nome_perfil]",
+  "(cliente3) quero marcar twists para sábado",
+  "(cliente3) 10h",
+  "(cliente3) [book_hora_840]",
+  "(cliente3) Ana",
+  "(equipa) /agenda sábado",
+  "(equipa) /confirmar {ultimo}",
+  "(equipa) /ocupar sábado 15h unhas de gel Joana",
+  "(equipa) /bloquear domingo",
+  "quero marcar sobrancelhas para domingo",
+  "cancelar",
+  // A cliente vê e cancela a sua marcação
+  "minhas marcações",
+  "cancelar marcação",
   // Comandos da equipa (só do 946)
   "(equipa) /promo 10% de desconto nas tranças até sexta",
   "tem promoção?",
@@ -82,11 +104,22 @@ const EXEMPLOS = [
 
 let contador = 0;
 
+// Código da última marcação guardada (para /confirmar {ultimo})
+function ultimoCodigo() {
+  const all = require("../src/services/agendaService").all().filter(m => m.codigo);
+  return all.length ? all[all.length - 1].codigo : "XXXX";
+}
+
 // Converte a mensagem de teste no payload que a Meta enviaria
 function message(text, id) {
   const fromTeam = text.startsWith("(equipa) ");
   if (fromTeam) text = text.slice("(equipa) ".length);
-  const base = { id, from: fromTeam ? "244946397096" : "244900000000" };
+  const other = /^\(cliente(\d)\) /.exec(text);
+  if (other) text = text.slice(other[0].length);
+  const from = fromTeam ? "244946397096" : other ? `24490000000${other[1]}` : "244900000000";
+  current = from;
+  text = text.replace("{ultimo}", ultimoCodigo());
+  const base = { id, from };
   let m;
   if ((m = /^\[(\w+)\]$/.exec(text))) {
     const reply = { id: m[1], title: m[1] };

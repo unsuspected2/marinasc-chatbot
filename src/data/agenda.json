@@ -1,0 +1,45 @@
+{
+  "_ajuda": "Duração dos serviços e quantas clientes cada área atende ao mesmo tempo. Ver docs/GUIA.md, secção Agenda.",
+  "intervalo_min": 30,
+  "antecedencia_min": 60,
+  "areas": {
+    "trancas": {
+      "nome": "Tranças e penteados",
+      "profissionais": 2,
+      "duracao_min": 180,
+      "palavras": ["bobe", "cordolete", "twist", "dread", "nago", "virada", "braid", "knotless", "french curl", "penteado", "peruca", "aplicacao de cabelo", "sanguita"]
+    },
+    "unhas": {
+      "nome": "Unhas",
+      "profissionais": 1,
+      "duracao_min": 60,
+      "palavras": ["unha", "gel", "porcelana", "gelinho", "manicure", "pedicure", "pe"]
+    },
+    "rosto": {
+      "nome": "Sobrancelhas e pestanas",
+      "profissionais": 1,
+      "duracao_min": 30,
+      "palavras": ["sobrancelha", "pestana", "henna"]
+    },
+    "cabelo": {
+      "nome": "Cabelo",
+      "profissionais": 1,
+      "duracao_min": 90,
+      "palavras": ["corte", "escova", "lavagem", "tratamento", "hidratacao", "alisamento", "coloracao", "mecha"]
+    }
+  },
+  "duracoes": {
+    "Viradas nagô": 120,
+    "Micro twists": 360,
+    "Natural twists": 300,
+    "Dreads": 240,
+    "French curls dreads": 300,
+    "Aplicação de gelinho": 45,
+    "Pé": 45,
+    "Pedicure completo": 60,
+    "Alongamento de gel": 90,
+    "Alongamento de porcelana": 120,
+    "Sobrancelhas": 20,
+    "Henna": 30
+  }
+}

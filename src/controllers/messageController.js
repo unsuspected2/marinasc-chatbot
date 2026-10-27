@@ -19,6 +19,7 @@ const whatsappService = require("../services/whatsappService");
 const faqService      = require("../services/faqService");
 const aiService       = require("../services/aiService");
 const bookingService  = require("../services/bookingService");
+const agendaService   = require("../services/agendaService");
 const promoService    = require("../services/promoService");
 const statsService    = require("../services/statsService");
 const adminService    = require("../services/adminService");
@@ -53,6 +54,11 @@ const KEYWORD_FLOWS = {
 
   // Pedidos de marcação → fluxo de pré-marcação
   bookingTriggers: ["marcar", "marcacao", "marcação", "agendar", "reservar", "fazer uma marcacao", "book", "appointment"],
+
+  // Ver, cancelar ou mudar marcações já feitas
+  myBookingsTriggers: ["minhas marcacoes", "minha marcacao", "minhas marcações", "minha marcação", "ver marcacao", "ver marcação", "tenho marcacao", "tenho marcação"],
+  cancelBookingTriggers: ["cancelar marcacao", "cancelar marcação", "cancelar a marcacao", "cancelar a marcação", "desmarcar", "cancelar o pedido", "nao vou poder ir", "não vou poder ir"],
+  rescheduleTriggers: ["remarcar", "mudar a marcacao", "mudar a marcação", "mudar marcacao", "mudar marcação", "trocar a hora", "mudar a hora", "mudar o dia", "adiar"],
 
   // Sair da pré-marcação
   cancelTriggers: ["cancelar", "cancela", "sair", "parar", "desistir", "menu", "cancel"],
@@ -282,6 +288,10 @@ async function handleMenuSelection(to, number, lang) {
 // Botões e listas interactivas
 // -------------------------------------------------------
 async function handleInteractive(to, name, id, lang, title) {
+  if ((id || "").startsWith("bk_")) {
+    await handleBookingAction(to, name, id);
+    return true;
+  }
   if ((id || "").startsWith("book_")) {
     if (!bookingService.isActive(to)) return startBooking(to, "", name).then(() => true);
     await continueBooking(to, title, name, id);
@@ -340,21 +350,102 @@ function isGreetingOnly(normalizedText) {
 async function sendBookingStep(to, result, name) {
   if (!result) return;
   if (result.reply) {
-    const { text, buttons } = result.reply;
-    if (buttons?.length) await whatsappService.sendButtons(to, text, buttons);
-    else await whatsappService.sendTextMessage(to, text);
+    const { text, buttons, list } = result.reply;
+    const rows = list?.sections.flatMap(sec => sec.rows) || [];
+    if (rows.length) {
+      await whatsappService.sendList(to, { body: text, button: list.button }, list.sections,
+        `${text}\n\nHoras livres: ${rows.map(r => r.title).join(", ")}`);
+    } else if (buttons?.length) {
+      await whatsappService.sendButtons(to, text, buttons);
+    } else {
+      await whatsappService.sendTextMessage(to, text);
+    }
     aiService.addToHistory(to, "assistant", text);
     return;
   }
 
-  const { resumo, url, marcacao } = result.done;
+  const { resumo, url, marcacao, substituida } = result.done;
   const status = horario.estado();
-  const text = `✅ Pedido de marcação pronto!\n\n${resumo}\n\n`
-    + "Toque em *Enviar à equipa* para mandar o pedido para o WhatsApp do salão (946 397 096). A equipa confirma a vaga consigo. 💖"
-    + (status.aberto ? "" : `\n\n🕘 ${horario.estadoTexto()} A equipa responde assim que abrirmos.`);
+  const text = `✅ Pedido de marcação registado!\n\n${resumo}\n\n`
+    + "A vaga fica reservada para si enquanto a equipa confirma. Vai receber a confirmação aqui. "
+    + "Se quiser, toque em *Enviar à equipa* para falar também com o salão (946 397 096). 💖"
+    + (substituida ? `\n\nA marcação anterior (#${substituida.codigo}) foi cancelada.` : "")
+    + (status.aberto ? "" : `\n\n🕘 ${horario.estadoTexto()} A equipa confirma assim que abrirmos.`);
   await whatsappService.sendLinkButton(to, text, "Enviar à equipa", url);
   aiService.addToHistory(to, "assistant", text);
-  logger.info("📅 Pré-marcação registada", { from: to, servico: marcacao.servico, dia: marcacao.dia });
+  logger.info("📅 Pré-marcação registada", { from: to, codigo: marcacao.codigo, servico: marcacao.servico, dia: marcacao.dia });
+  await notifyTeam(`📅 *${substituida ? "Remarcação" : "Novo pedido de marcação"}*\n\n${agendaService.describe(marcacao, { withClient: true })}`
+    + (substituida ? `\n   (substitui #${substituida.codigo})` : "")
+    + `\n\nPara confirmar: /confirmar ${marcacao.codigo}\nPara recusar: /recusar ${marcacao.codigo} motivo`);
+}
+
+// -------------------------------------------------------
+// Avisa a equipa (946) pelo bot. A Meta só entrega se a equipa tiver
+// escrito ao bot nas últimas 24 h; senão o pedido continua na agenda
+// (/agenda) e no link "Enviar à equipa" do cliente.
+// -------------------------------------------------------
+async function notifyTeam(text) {
+  for (const admin of config.adminNumbers) {
+    try {
+      await whatsappService.sendTextMessage(admin, text);
+    } catch {
+      logger.warn("Não foi possível avisar a equipa pelo bot (janela de 24 h?)", { admin });
+    }
+  }
+}
+
+// -------------------------------------------------------
+// Cliente: ver, cancelar e remarcar marcações já feitas
+// -------------------------------------------------------
+async function sendMyBookings(to, intent = "ver") {
+  const mine = agendaService.upcomingOf(to);
+  if (!mine.length) {
+    await sendWithNextStep(to, "Não encontrei marcações futuras neste número. Quer fazer uma? Toque em *Marcar*. 😊", "pt");
+    return;
+  }
+  const list = mine.map(m => agendaService.describe(m)).join("\n");
+  const legenda = "\n\n⏳ à espera da confirmação da equipa · ✅ confirmada";
+  if (mine.length === 1) {
+    const m = mine[0];
+    const pergunta = intent === "cancelar" ? "Quer mesmo cancelar?" : intent === "remarcar" ? "Quer mudar para outro dia ou hora?" : "O que deseja fazer?";
+    const buttons = intent === "cancelar"
+      ? [{ id: `bk_cancelar_${m.codigo}`, title: "Sim, cancelar" }, { id: "btn_menu", title: "Não, manter" }]
+      : [{ id: `bk_remarcar_${m.codigo}`, title: "Mudar dia/hora" }, { id: `bk_cancelar_${m.codigo}`, title: "Cancelar" }, { id: "btn_menu", title: "Ver opções" }];
+    await whatsappService.sendButtons(to, `📅 A sua marcação:\n${list}${legenda}\n\n${pergunta}`, buttons);
+    return;
+  }
+  const rows = mine.slice(0, 10).map(m => ({
+    id: `bk_escolher_${m.codigo}`,
+    title: `#${m.codigo} ${agendaService.horaLabel(m.inicio)}`,
+    description: `${m.servico}, ${agendaService.dayText(m.dia)}`,
+  }));
+  await whatsappService.sendList(to, { body: `📅 As suas marcações:\n${list}${legenda}\n\nEscolha uma para mudar ou cancelar.`, button: "Escolher" },
+    [{ title: "Marcações", rows }], `📅 As suas marcações:\n${list}${legenda}\n\nPara cancelar, escreva *cancelar #CÓDIGO*.`);
+}
+
+async function handleBookingAction(to, name, id) {
+  const [, action, codigo] = /^bk_(\w+?)_(\w+)$/.exec(id) || [];
+  const m = agendaService.find(codigo);
+  if (!m || m.cliente !== to || !["pendente", "confirmada"].includes(m.estado || "pendente")) {
+    await sendWithNextStep(to, "Essa marcação já não está activa. Quer fazer uma nova? Toque em *Marcar*.", "pt");
+    return;
+  }
+  if (action === "escolher") {
+    await whatsappService.sendButtons(to, `${agendaService.describe(m)}\n\nO que deseja fazer?`,
+      [{ id: `bk_remarcar_${m.codigo}`, title: "Mudar dia/hora" }, { id: `bk_cancelar_${m.codigo}`, title: "Cancelar" }, { id: "btn_menu", title: "Manter" }]);
+    return;
+  }
+  if (action === "cancelar") {
+    agendaService.setState(m.codigo, "cancelada", { motivo: "cancelada pelo cliente" });
+    await sendWithNextStep(to, `🚫 Marcação #${m.codigo} cancelada. Obrigada por avisar! Quando quiser, marcamos outra. 💖`, "pt");
+    logger.info("Marcação cancelada pelo cliente", { from: to, codigo: m.codigo });
+    await notifyTeam(`🚫 *Cliente cancelou*\n\n${agendaService.describe({ ...m, estado: "cancelada" }, { withClient: true })}\n\nA vaga ficou livre.`);
+    return;
+  }
+  if (action === "remarcar") {
+    bookingService.startReschedule(to, m);
+    await sendBookingStep(to, { reply: bookingService.prompt(bookingService.getFlow(to), firstName(name)) }, name);
+  }
 }
 
 async function startBooking(to, text, name) {
@@ -434,7 +525,7 @@ async function handleIncomingMessage(req, res) {
 
     // 4. Comandos da equipa (só do 946 397 096 / ADMIN_NUMBERS)
     if (type === "text" && text.startsWith("/")) {
-      const adminReply = adminService.handleCommand(from, text);
+      const adminReply = await adminService.handleCommand(from, text);
       if (adminReply) {
         await whatsappService.sendTextMessage(from, adminReply);
         return;
@@ -535,6 +626,15 @@ async function handleText(from, name, text, lang) {
     const handled = await handleMenuSelection(from, text.trim(), lang);
     if (handled) return;
   }
+
+  // D0. Marcações já feitas: ver, cancelar ("cancelar #K7Q2" também) ou mudar
+  const codeMatch = /#?\b([A-HJ-NP-Z2-9]{4})\b/.exec(text.toUpperCase());
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.cancelBookingTriggers)) {
+    if (codeMatch && agendaService.find(codeMatch[1])?.cliente === from) return handleBookingAction(from, name, `bk_cancelar_${codeMatch[1]}`);
+    return sendMyBookings(from, "cancelar");
+  }
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.rescheduleTriggers)) return sendMyBookings(from, "remarcar");
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.myBookingsTriggers)) return sendMyBookings(from, "ver");
 
   // D. Pedido de marcação → pré-marcação guiada
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.bookingTriggers) && !bookingService.isActive(from)) {

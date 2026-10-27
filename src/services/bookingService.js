@@ -1,16 +1,16 @@
 // ============================================================
 // services/bookingService.js
-// Pré-marcação: pergunta serviço, dia, hora e nome, gera o link
-// wa.me da equipa com o pedido escrito e guarda o pedido em
-// data/marcacoes.json (para as estatísticas).
+// Pré-marcação: pergunta serviço, dia, hora e nome. Só oferece horas
+// livres na agenda (agendaService), guarda o pedido como pendente
+// (a vaga fica reservada) e gera o link wa.me da equipa.
 //
-// O bot nunca confirma a vaga: quem confirma é a equipa no 946.
+// O bot nunca confirma a vaga: quem confirma é a equipa (/confirmar).
 // ============================================================
 
-const crypto = require("crypto");
 const faq = require("../data/faq.json");
 const store = require("../utils/store");
 const horario = require("../utils/horario");
+const agenda = require("./agendaService");
 
 const TEAM_NUMBER = "244946397096";
 const FLOW_TTL_MS = 2 * 60 * 60 * 1000; // uma pré-marcação parada 2 h recomeça
@@ -66,6 +66,12 @@ function dayLabel(iso, prefix) {
   return `${prefix ? `${prefix}, ` : ""}${WEEKDAY_NAMES[d.getUTCDay()]}, ${day}/${m}`;
 }
 
+function dayFromIso(iso) {
+  const t = horario.agora();
+  const prefix = iso === t.data ? "hoje" : iso === addDays(t.data, 1) ? "amanhã" : null;
+  return { label: dayLabel(iso, prefix), data: iso };
+}
+
 function parseDay(text) {
   const n = normalize(text);
   const t = horario.agora();
@@ -118,15 +124,6 @@ function parseTime(text) {
   return null;
 }
 
-// Horário do salão nesse dia, para validar a hora pedida
-function openingHours(iso) {
-  const h = require("../data/horario.json");
-  if ((h.fechado_em || []).includes(iso)) return null;
-  const key = ["domingo", "segunda", "terca", "quarta", "quinta", "sexta", "sabado"][new Date(`${iso}T12:00:00Z`).getUTCDay()];
-  return h.dias[key] || null;
-}
-
-const toMin = hhmm => hhmm.split(":").map(Number).reduce((h, m) => h * 60 + m);
 
 // -------------------------------------------------------
 // Estado da conversa
@@ -162,16 +159,24 @@ function prompt(f, profileName) {
   switch (nextStep(f)) {
     case "servico":
       return { text: "📅 Vamos preparar a sua marcação! Que serviço deseja? (ex.: cordoletes com cachos, unhas de gel, sobrancelhas)" };
-    case "dia":
+    case "dia": {
+      // Os 3 próximos dias com vaga para este serviço
+      const dias = [];
+      let from = horario.agora().data;
+      while (dias.length < 3) {
+        const n = agenda.nextFreeDay(from, f.servico);
+        if (!n) break;
+        dias.push(n.dia);
+        from = agenda.addDays(n.dia, 1);
+      }
+      const antes = f.semVaga ? `Para ${f.semVaga} já não há vagas para ${f.servico}. ` : `${f.servico}, óptimo! `;
       return {
-        text: `${f.servico}, óptimo! Para que dia? Pode escrever o dia (ex.: sábado, 15/11).`,
-        buttons: [{ id: "book_dia_hoje", title: "Hoje" }, { id: "book_dia_amanha", title: "Amanhã" }],
+        text: `${antes}Para que dia? Escolha um dia com vaga ou escreva outro (ex.: sábado, 15/11).`,
+        buttons: dias.map(d => ({ id: `book_dia_${d}`, title: shortDay(d) })),
       };
+    }
     case "hora":
-      return {
-        text: `${capitalize(f.dia.label)}. A que horas prefere? Pode escrever a hora (ex.: 10h) ou escolher:`,
-        buttons: [{ id: "book_hora_manha", title: "De manhã" }, { id: "book_hora_tarde", title: "À tarde" }, { id: "book_hora_fim", title: "Fim da tarde" }],
-      };
+      return hourPrompt(f);
     case "nome":
       return {
         text: "Por fim, em que nome fica a marcação?",
@@ -193,9 +198,95 @@ function capitalize(s) {
 function start(from, text = "") {
   const f = { servico: findService(text), dia: parseDay(text), hora: null, nome: null, updatedAt: Date.now() };
   const hora = parseTime(text);
-  if (hora && f.dia) f.hora = hora;
+  // Só fica com a hora se estiver livre; senão o passo "hora" mostra as livres
+  if (f.servico && f.dia && hora?.minutos !== undefined && !agenda.whyNot(f.dia.data, hora.minutos, f.servico)) f.hora = hora;
+  if (f.dia && (!agenda.openingHours(f.dia.data) || (f.servico && !agenda.freeSlots(f.dia.data, f.servico).length))) {
+    f.semVaga = f.dia.label; // o passo "dia" explica porquê
+    f.dia = null;
+  }
   flows.set(from, f);
   return f;
+}
+
+// Remarcação: novo pedido para o mesmo serviço; a marcação antiga é
+// cancelada quando o novo pedido fica pronto
+function startReschedule(from, marcacao) {
+  const f = { servico: marcacao.servico, dia: null, hora: null, nome: marcacao.nome, substitui: marcacao.codigo, updatedAt: Date.now() };
+  flows.set(from, f);
+  return f;
+}
+
+// -------------------------------------------------------
+// Passo "hora": lista as horas livres desse dia (máx. 10, espalhadas)
+// -------------------------------------------------------
+const PERIODS = {
+  manha: { label: "de manhã", from: 0, to: 12 * 60 },
+  tarde: { label: "à tarde", from: 12 * 60, to: 17 * 60 },
+  fim: { label: "ao fim da tarde", from: 17 * 60, to: 24 * 60 },
+  noite: { label: "à noite", from: 18 * 60, to: 24 * 60 },
+};
+
+function spread(list, n) {
+  if (list.length <= n) return list;
+  return Array.from({ length: n }, (_, i) => list[Math.round(i * (list.length - 1) / (n - 1))]);
+}
+
+function slotList(slots) {
+  const rows = spread(slots, 10).map(m => ({ id: `book_hora_${m}`, title: agenda.horaLabel(m) }));
+  const sections = [
+    { title: "Manhã", rows: rows.filter(r => +r.id.slice(10) < 12 * 60) },
+    { title: "Tarde", rows: rows.filter(r => +r.id.slice(10) >= 12 * 60 && +r.id.slice(10) < 17 * 60) },
+    { title: "Fim da tarde", rows: rows.filter(r => +r.id.slice(10) >= 17 * 60) },
+  ].filter(sec => sec.rows.length);
+  return { button: "Ver horas livres", sections };
+}
+
+function durationText(servico) {
+  const d = agenda.durationFor(servico);
+  return d >= 60 ? `cerca de ${Math.floor(d / 60)}h${d % 60 ? String(d % 60).padStart(2, "0") : ""}` : `cerca de ${d} min`;
+}
+
+function hourPrompt(f, intro = "") {
+  const slots = agenda.freeSlots(f.dia.data, f.servico);
+  return {
+    text: `${intro}${capitalize(f.dia.label)}. Estas são as horas livres para ${f.servico} (${durationText(f.servico)}). `
+      + "Escolha uma na lista ou escreva a hora que prefere (ex.: 10h).",
+    list: slotList(slots),
+  };
+}
+
+// Botões com as horas livres mais perto (quando a pedida não dá)
+function nearestButtons(f, minutos) {
+  return agenda.nearest(f.dia.data, minutos, f.servico, 3)
+    .map(m => ({ id: `book_hora_${m}`, title: agenda.horaLabel(m) }));
+}
+
+// Dia sem vagas: sugere os próximos dias com vaga
+function noSlotsReply(f, dia) {
+  const next = [];
+  let from = agenda.addDays(dia.data, 1);
+  while (next.length < 3) {
+    const n = agenda.nextFreeDay(from, f.servico);
+    if (!n) break;
+    next.push(n.dia);
+    from = agenda.addDays(n.dia, 1);
+  }
+  const why = agenda.openingHours(dia.data) ? `já não há vagas para ${f.servico}` : "o salão está fechado";
+  return {
+    reply: {
+      text: `Nesse dia (${dia.label}) ${why} 😕 ${next.length ? "Tenho vaga nestes dias:" : "Escolha outro dia, por favor."}`,
+      buttons: next.map(d => ({ id: `book_dia_${d}`, title: shortDay(d) })),
+    },
+  };
+}
+
+function shortDay(iso) {
+  const t = horario.agora().data;
+  if (iso === t) return "Hoje";
+  if (iso === addDays(t, 1)) return "Amanhã";
+  const [, m, d] = iso.split("-");
+  const wd = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"][new Date(`${iso}T12:00:00Z`).getUTCDay()];
+  return `${wd} ${d}/${m}`;
 }
 
 // -------------------------------------------------------
@@ -221,25 +312,30 @@ function answer(from, text, { interactiveId, profileName } = {}) {
     case "dia": {
       const dia = interactiveId === "book_dia_hoje" ? parseDay("hoje")
         : interactiveId === "book_dia_amanha" ? parseDay("amanhã")
+        : /^book_dia_\d{4}-\d{2}-\d{2}$/.test(interactiveId || "") ? dayFromIso(interactiveId.slice(9))
         : parseDay(value);
       if (!dia) return { reply: { text: "Não percebi o dia 🙈 Pode escrever, por exemplo, *sábado*, *amanhã* ou *15/11*?" } };
-      const hours = openingHours(dia.data);
-      if (!hours) return { reply: { text: `Nesse dia (${dia.label}) o salão está fechado. Escolha outro dia, por favor.` } };
+      if (!agenda.freeSlots(dia.data, f.servico).length) return noSlotsReply(f, dia);
       f.dia = dia;
+      delete f.semVaga;
       const hora = parseTime(value);
-      if (hora) f.hora = hora;
+      if (hora?.minutos !== undefined && !agenda.whyNot(dia.data, hora.minutos, f.servico)) f.hora = hora;
       break;
     }
 
     case "hora": {
-      const hora = { book_hora_manha: { label: "de manhã" }, book_hora_tarde: { label: "à tarde" }, book_hora_fim: { label: "ao fim da tarde" } }[interactiveId]
-        || parseTime(value);
-      if (!hora) return { reply: { text: "Não percebi a hora 🙈 Pode escrever, por exemplo, *10h*, *14:30* ou *de manhã*?" } };
-      const hours = openingHours(f.dia.data);
-      if (hora.minutos !== undefined && hours && (hora.minutos < toMin(hours[0]) || hora.minutos >= toMin(hours[1]))) {
-        return { reply: { text: `Nesse dia abrimos das ${horario.horaCurta(hours[0])} às ${horario.horaCurta(hours[1])}. Que hora prefere dentro desse horário?` } };
+      const period = PERIODS[interactiveId?.slice(10)] || (!/\d/.test(value) && Object.values(PERIODS).find(p => parseTime(value)?.label === p.label));
+      if (period) {
+        const slots = agenda.freeSlots(f.dia.data, f.servico, period);
+        if (!slots.length) return { reply: { ...hourPrompt(f, `${capitalize(period.label)} já não há vagas. `) } };
+        return { reply: { text: `Horas livres ${period.label}:`, list: slotList(slots) } };
       }
-      f.hora = hora;
+      const fromList = /^book_hora_(\d+)$/.exec(interactiveId || "");
+      const hora = fromList ? { minutos: +fromList[1] } : parseTime(value);
+      if (hora?.minutos === undefined) return { reply: { text: "Não percebi a hora 🙈 Pode escrever, por exemplo, *10h* ou *14:30*, ou escolher na lista.", list: slotList(agenda.freeSlots(f.dia.data, f.servico)) } };
+      const why = agenda.whyNot(f.dia.data, hora.minutos, f.servico);
+      if (why) return { reply: busyReply(f, hora.minutos, why) };
+      f.hora = { minutos: hora.minutos, label: `às ${agenda.horaLabel(hora.minutos)}` };
       break;
     }
 
@@ -249,39 +345,51 @@ function answer(from, text, { interactiveId, profileName } = {}) {
       break;
   }
 
+  // Serviço escolhido depois do dia ("marcar para sábado" → "tranças"): esse dia ainda tem vaga?
+  if (f.dia && !f.hora && f.servico && !agenda.freeSlots(f.dia.data, f.servico).length) {
+    const cheio = f.dia;
+    f.dia = null;
+    flows.save();
+    return noSlotsReply(f, cheio);
+  }
+
   if (nextStep(f) !== "fim") {
     flows.save();
     return { reply: prompt(f, profileName) };
   }
 
-  // Pedido pronto
+  // Pedido pronto: confirma outra vez que a vaga continua livre
+  // (outra cliente pode ter ficado com ela entretanto)
+  const why = agenda.whyNot(f.dia.data, f.hora.minutos, f.servico);
+  if (why) {
+    const pedido = f.hora.minutos;
+    f.hora = null;
+    flows.save();
+    return { reply: busyReply(f, pedido, why) };
+  }
   flows.delete(from);
+  const marcacao = agenda.create({ cliente: from, nome: f.nome, servico: f.servico, dia: f.dia.data, inicio: f.hora.minutos, substitui: f.substitui });
+  const substituida = f.substitui ? agenda.setState(f.substitui, "cancelada", { motivo: `remarcada para #${marcacao.codigo}` }) : null;
   const diaTexto = f.dia.label.replace(/^(hoje|amanhã), /, "$1, ");
-  const mensagem = `Olá, sou ${f.nome}, quero marcar ${f.servico} para ${diaTexto}, ${f.hora.label}.`;
+  const mensagem = `Olá, sou ${f.nome}, quero marcar ${f.servico} para ${diaTexto}, ${f.hora.label}. (pedido #${marcacao.codigo})`;
   const url = `https://wa.me/${TEAM_NUMBER}?text=${encodeURIComponent(mensagem)}`;
-  const marcacao = save({ from, ...f });
-  return { done: { resumo: `• Serviço: ${f.servico}\n• Dia: ${capitalize(f.dia.label)}\n• Hora: ${f.hora.label.replace(/^às /, "")}\n• Nome: ${f.nome}`, url, mensagem, marcacao } };
+  return { done: { resumo: `• Serviço: ${f.servico}\n• Dia: ${capitalize(f.dia.label)}\n• Hora: ${f.hora.label.replace(/^às /, "")} (${durationText(f.servico)})\n• Nome: ${f.nome}\n• Código: #${marcacao.codigo}`, url, mensagem, marcacao, substituida } };
 }
 
-// -------------------------------------------------------
-// Guarda a pré-marcação em data/marcacoes.json
-// -------------------------------------------------------
-function save({ from, servico, dia, hora, nome }) {
-  const t = horario.agora();
-  const marcacao = {
-    id: crypto.randomUUID(),
-    criadaEm: new Date().toISOString(),
-    dataPedido: t.data,
-    cliente: from,
-    nome,
-    servico,
-    dia: dia.data,
-    hora: hora.label,
-  };
-  const all = store.readJson("marcacoes.json", []);
-  all.push(marcacao);
-  store.writeJson("marcacoes.json", all);
-  return marcacao;
+// A hora pedida não dá: explica porquê e mostra as livres mais perto
+function busyReply(f, minutos, why) {
+  const hours = agenda.openingHours(f.dia.data);
+  const buttons = nearestButtons(f, minutos);
+  const pedido = minutos ? `Às ${agenda.horaLabel(minutos)}` : "Essa hora";
+  const text = {
+    fora_do_horario: `${pedido} não dá: nesse dia abrimos das ${horario.horaCurta(hours?.[0] || "00:00")} às ${horario.horaCurta(hours?.[1] || "00:00")} e ${f.servico} leva ${durationText(f.servico)}.`,
+    passou: `${pedido} já passou ou está muito em cima da hora.`,
+    ocupado: `${pedido} já não temos vaga para ${f.servico} 😕`,
+    bloqueado: `${pedido} o salão não está disponível.`,
+    fechado: "Nesse dia o salão está fechado.",
+  }[why];
+  if (!buttons.length) return noSlotsReply(f, f.dia).reply;
+  return { text: `${text} Horas livres mais perto:`, buttons };
 }
 
-module.exports = { start, answer, prompt, isActive, cancel, getFlow, findService, parseDay, parseTime };
+module.exports = { start, startReschedule, answer, prompt, isActive, cancel, getFlow, findService, parseDay, parseTime };

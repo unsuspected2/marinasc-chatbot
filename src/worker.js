@@ -17,6 +17,7 @@ import { DurableObject } from "cloudflare:workers";
 import store from "./utils/store";
 import controller from "./controllers/messageController";
 import logger from "./utils/logger";
+import horario from "./utils/horario";
 
 // A Meta assina cada POST com o "Segredo da app" (X-Hub-Signature-256).
 // Com APP_SECRET definido, pedidos sem assinatura válida são recusados.
@@ -53,7 +54,16 @@ export class Bot extends DurableObject {
   }
 
   async fetch(request) {
+    // GET /estado: para o /health (sem dados de clientes)
+    if (request.method === "GET") {
+      const t = horario.agora().data;
+      const dia = store.readJson("conversas.json", { dias: {} }).dias[t];
+      return Response.json({ ...store.readJson("ultima-mensagem.json", {}), mensagensHoje: dia?.mensagens || 0 });
+    }
     const body = await request.json();
+    if (body?.entry?.[0]?.changes?.[0]?.value?.messages) {
+      store.writeJson("ultima-mensagem.json", { ultimaMensagem: new Date().toISOString() });
+    }
     try {
       await controller.handleIncomingMessage({ body }, fakeRes());
     } catch (err) {
@@ -86,7 +96,9 @@ export default {
     }
 
     if (url.pathname === "/health") {
-      return Response.json({ status: "ok", service: "marinasc-chatbot", runtime: "cloudflare", timestamp: new Date().toISOString() });
+      const bot = env.BOT.get(env.BOT.idFromName("marinasc"));
+      const estado = await (await bot.fetch("https://bot/estado")).json();
+      return Response.json({ status: "ok", service: "marinasc-chatbot", runtime: "cloudflare", timestamp: new Date().toISOString(), ...estado });
     }
 
     return env.ASSETS.fetch(request);
