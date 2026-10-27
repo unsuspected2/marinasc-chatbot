@@ -15,6 +15,7 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
   https://marinasc.marinasc-chatbot.workers.dev/
 
 **Como usar (marcações, comandos da equipa): [docs/COMO-USAR.md](docs/COMO-USAR.md).**
+**Redes sociais e Google (bios, publicações, avaliações): [docs/REDES-SOCIAIS.md](docs/REDES-SOCIAIS.md).**
 **Uso diário (preços, promoções, horário, o que fazer se o bot parar): [docs/GUIA.md](docs/GUIA.md).**
 
 ## Estrutura
