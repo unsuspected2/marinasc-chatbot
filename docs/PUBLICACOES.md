@@ -1,6 +1,6 @@
 # Plano de publicações: Novembro 2026
 
-Instagram (@marynasc_salao_de_beleza_) e TikTok (@salao.marinasc). Três publicações por semana:
+Instagram (@marynasc_salao_de_beleza_) e TikTok (@salo.marinasc). Três publicações por semana:
 **segunda** (trabalho feito), **quarta** (dica ou bastidores), **sexta/sábado** (oferta e chamada
 para marcar). Os vídeos curtos (Reels/TikTok) são os mesmos nas duas redes.
 

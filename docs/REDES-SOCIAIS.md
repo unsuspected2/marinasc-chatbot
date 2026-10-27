@@ -3,7 +3,7 @@
 | Rede | Conta | Para quê |
 |---|---|---|
 | Instagram | @marynasc_salao_de_beleza_ | fotos e Reels dos trabalhos, stories, mensagens (bot, depois de ligado) |
-| TikTok | @salao.marinasc | os mesmos vídeos curtos, para chegar a quem ainda não nos conhece |
+| TikTok | @salo.marinasc | os mesmos vídeos curtos, para chegar a quem ainda não nos conhece |
 | Facebook | página MariNasc (link no Instagram) | os mesmos posts; partilhar a partir do Instagram |
 | Google (Maps e Pesquisa) | MARINASC | quem procura "salão Kilamba": horário, preços, avaliações, direcções |
 | WhatsApp do bot | 955 705 188 | marcações 24 h; a equipa confirma no 946 397 096 |
@@ -23,13 +23,14 @@ TikTok e Facebook. Acrescentar o site `https://marinasc.marinasc-chatbot.workers
 `https://wa.me/244955705188`.
 Botão de contacto (conta profissional → Opções de contacto): WhatsApp **955 705 188**.
 
-**TikTok**: Editar perfil → Biografia (máx. 80 caracteres):
+**TikTok** (@salo.marinasc, a conta nova; a antiga @salao.marinasc deixou de ser usada):
+Editar perfil → Descrição (máx. 80 caracteres). Em uso desde 27/10/2026:
 ```
-✨Salão MariNasc · Kilamba C19 · Marcações 24h WhatsApp 955705188
+Kilamba C19 · Cabelo, Unhas, Spa e Barbearia
+📲 Marque 24h: WhatsApp 955705188
 ```
-Website (aparece com 1.000 seguidores ou conta Empresa): o mesmo link do site.
-Instagram ligado: `marynasc_salao_de_beleza_` (sem acento: a bio actual tem "salão" com acento, que
-não é o nome certo da conta).
+Website (aparece com 1.000 seguidores ou conta Empresa): o link do site. No Instagram, a ligação do
+TikTok deve apontar para `https://www.tiktok.com/@salo.marinasc`.
 
 ## 2. Publicar
 
