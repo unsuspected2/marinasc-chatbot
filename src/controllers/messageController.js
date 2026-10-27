@@ -6,15 +6,21 @@
 //  1. Parse do payload recebido e descarte de repetidos
 //  2. Marcar mensagem como lida + "a escrever..."
 //  3. Áudio → transcrição; foto/vídeo/documento → encaminha para a equipa
-//  4. Botões e listas interactivas, números do menu (1 a 7), comandos
-//  5. Cumprimento simples → menu com saudação pela hora de Luanda
-//  6. Conversa livre: OpenAI, com o histórico da conversa
-//  7. Sem IA: keywords de fluxos especiais e FAQ
+//  4. Comandos da equipa (/stats, /promo, /pausa…) e bot em pausa
+//  5. Pré-marcação (serviço → dia → hora → nome → link para a equipa)
+//  6. Botões e listas interactivas, números do menu (1 a 7), comandos
+//  7. Cumprimento simples → menu com saudação pela hora de Luanda
+//  8. Conversa livre: OpenAI, com o histórico da conversa
+//  9. Sem IA: keywords de fluxos especiais e FAQ
 // ============================================================
 
 const whatsappService = require("../services/whatsappService");
 const faqService      = require("../services/faqService");
 const aiService       = require("../services/aiService");
+const bookingService  = require("../services/bookingService");
+const promoService    = require("../services/promoService");
+const statsService    = require("../services/statsService");
+const adminService    = require("../services/adminService");
 const horario         = require("../utils/horario");
 const logger          = require("../utils/logger");
 
@@ -42,6 +48,15 @@ const KEYWORD_FLOWS = {
 
   // Perguntas de preço (sem resposta no FAQ → "o preço depende")
   priceTriggers: ["quanto", "qt", "qto", "preço", "preco", "custa", "valor", "price", "cost"],
+
+  // Pedidos de marcação → fluxo de pré-marcação
+  bookingTriggers: ["marcar", "marcacao", "marcação", "agendar", "reservar", "fazer uma marcacao", "book", "appointment"],
+
+  // Sair da pré-marcação
+  cancelTriggers: ["cancelar", "cancela", "sair", "parar", "desistir", "menu", "cancel"],
+
+  // Promoções
+  promoTriggers: ["promo", "promocao", "promoção", "promoções", "promocoes", "desconto", "descontos", "campanha"],
 };
 
 // Palavras de cortesia que não mudam um cumprimento ("olá, tudo bem?")
@@ -114,6 +129,9 @@ function isDuplicate(messageId) {
   seenMessages.set(messageId, now);
   return false;
 }
+
+// Clientes que já receberam o aviso de pausa (limpa quando o bot retoma)
+const pausedNotified = new Set();
 
 // -------------------------------------------------------
 // Comandos especiais do sistema
@@ -193,6 +211,9 @@ async function sendMenu(to, lang, name) {
       + "\n\nComo podemos ajudar?";
   }
 
+  const promo = promoService.promoText();
+  if (promo) body = body.replace(/\n\n(Como podemos ajudar\?|How can we help\?)$/, `\n\n${promo}\n\n$1`);
+
   const options = MENU_OPTIONS[lang] || MENU_OPTIONS.pt;
   const rows = options.map((o, i) => ({ id: `menu_${i + 1}`, title: o.title, description: o.description }));
   const textMenu = `${body}\n\n${options.map((o, i) => `${i + 1}. ${o.text}`).join("\n")}`
@@ -244,9 +265,9 @@ async function handleMenuSelection(to, number, lang) {
     answer = TEAM_CONTACT[lang] || TEAM_CONTACT.pt;
     await sendTeamContact(to, lang);
   } else if (key === "menu_marcar") {
-    // Opção 6: fazer uma marcação
-    answer = faqService.findAnswer(key);
-    await sendTeamContact(to, lang, answer.replace(/\n*👉 https:\/\/wa\.me\/\S+/, ""));
+    // Opção 6: pré-marcação guiada
+    await startBooking(to, "", null);
+    return true;
   } else {
     answer = faqService.findAnswer(key);
     if (!answer) return false;
@@ -262,7 +283,13 @@ async function handleMenuSelection(to, number, lang) {
 // -------------------------------------------------------
 // Botões e listas interactivas
 // -------------------------------------------------------
-async function handleInteractive(to, name, id, lang) {
+async function handleInteractive(to, name, id, lang, title) {
+  if ((id || "").startsWith("book_")) {
+    if (!bookingService.isActive(to)) return startBooking(to, "", name).then(() => true);
+    await continueBooking(to, title, name, id);
+    return true;
+  }
+
   const menuMatch = /^menu_(\d)$/.exec(id || "");
   if (menuMatch) return handleMenuSelection(to, menuMatch[1], lang);
 
@@ -307,6 +334,39 @@ function isGreetingOnly(normalizedText) {
     rest = rest.split(` ${w} `).join(" ");
   }
   return rest.trim().split(/\s+/).filter(Boolean).length <= 1;
+}
+
+// -------------------------------------------------------
+// Pré-marcação: envia a pergunta do passo actual ou o pedido pronto
+// -------------------------------------------------------
+async function sendBookingStep(to, result, name) {
+  if (!result) return;
+  if (result.reply) {
+    const { text, buttons } = result.reply;
+    if (buttons?.length) await whatsappService.sendButtons(to, text, buttons);
+    else await whatsappService.sendTextMessage(to, text);
+    aiService.addToHistory(to, "assistant", text);
+    return;
+  }
+
+  const { resumo, url, marcacao } = result.done;
+  const status = horario.estado();
+  const text = `✅ Pedido de marcação pronto!\n\n${resumo}\n\n`
+    + "Toque em *Enviar à equipa* para mandar o pedido para o WhatsApp do salão (946 397 096). A equipa confirma a vaga consigo. 💖"
+    + (status.aberto ? "" : `\n\n🕘 ${horario.estadoTexto()} A equipa responde assim que abrirmos.`);
+  await whatsappService.sendLinkButton(to, text, "Enviar à equipa", url);
+  aiService.addToHistory(to, "assistant", text);
+  logger.info("📅 Pré-marcação registada", { from: to, servico: marcacao.servico, dia: marcacao.dia });
+}
+
+async function startBooking(to, text, name) {
+  bookingService.start(to, text);
+  await sendBookingStep(to, { reply: bookingService.prompt(bookingService.getFlow(to), firstName(name)) }, name);
+}
+
+async function continueBooking(to, text, name, interactiveId) {
+  const profileName = firstName(name);
+  await sendBookingStep(to, bookingService.answer(to, text, { interactiveId, profileName }), name);
 }
 
 // -------------------------------------------------------
@@ -374,6 +434,27 @@ async function handleIncomingMessage(req, res) {
     // 3. Marca como lida e mostra "a escrever..." enquanto o bot pensa
     await whatsappService.markAsRead(messageId);
 
+    // 4. Comandos da equipa (só do 946 397 096 / ADMIN_NUMBERS)
+    if (type === "text" && text.startsWith("/")) {
+      const adminReply = adminService.handleCommand(from, text);
+      if (adminReply) {
+        await whatsappService.sendTextMessage(from, adminReply);
+        return;
+      }
+    }
+
+    if (!adminService.isAdmin(from)) statsService.recordMessage(from);
+
+    // Bot em pausa (/pausa): só o link da equipa, uma vez por cliente
+    if (adminService.isPaused() && !adminService.isAdmin(from)) {
+      if (!pausedNotified.has(from)) {
+        pausedNotified.add(from);
+        await sendTeamContact(from, "pt", "💖 Olá! Fale connosco directamente no WhatsApp do salão, 946 397 096.");
+      }
+      return;
+    }
+    pausedNotified.clear();
+
     // 4. Tipos que não são texto
     if (type === "audio") {
       text = await transcribeIncomingAudio(parsed.mediaId);
@@ -404,7 +485,7 @@ async function handleIncomingMessage(req, res) {
 
     // 6. Botões e listas interactivas
     if (type === "interactive") {
-      const handled = await handleInteractive(from, name, parsed.interactiveId, lang);
+      const handled = await handleInteractive(from, name, parsed.interactiveId, lang, text);
       if (handled) return;
     }
 
@@ -436,13 +517,49 @@ async function handleText(from, name, text, lang) {
     return;
   }
 
-  // B. Seleção numérica do menu (usuário digitou "1" a "7")
+  // B. Pré-marcação a decorrer: a mensagem é a resposta ao passo actual
+  // (antes dos números: "3" a meio da marcação pode ser a hora)
+  if (bookingService.isActive(from)) {
+    if (containsTrigger(normalizedText, KEYWORD_FLOWS.cancelTriggers) && normalizedText.split(/\s+/).length <= 3) {
+      bookingService.cancel(from);
+      await sendWithNextStep(from, "Pedido de marcação cancelado. Em que mais posso ajudar? 😊", lang);
+      return;
+    }
+    // Uma pergunta a meio ("quanto custa?") responde-se e depois retoma-se
+    if (!text.includes("?")) {
+      await continueBooking(from, text, name);
+      return;
+    }
+  }
+
+  // C. Seleção numérica do menu (usuário digitou "1" a "7")
   if (/^[1-7]$/.test(text.trim())) {
     const handled = await handleMenuSelection(from, text.trim(), lang);
     if (handled) return;
   }
 
-  // C. Só um cumprimento ("olá", "bom dia", "menu") → menu principal.
+  // D. Pedido de marcação → pré-marcação guiada
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.bookingTriggers) && !bookingService.isActive(from)) {
+    logger.info("Início de pré-marcação", { from });
+    aiService.addToHistory(from, "user", text);
+    await startBooking(from, text, name);
+    return;
+  }
+
+  await answerFreeText(from, name, text, lang, normalizedText);
+
+  // Lembra o passo da marcação depois de responder a uma pergunta
+  if (bookingService.isActive(from)) {
+    const step = bookingService.prompt(bookingService.getFlow(from), firstName(name));
+    if (step) await sendBookingStep(from, { reply: { ...step, text: `Continuando a sua marcação: ${step.text}` } }, name);
+  }
+}
+
+// -------------------------------------------------------
+// Pergunta livre: IA, ou FAQ e palavras-chave se a IA falhar
+// -------------------------------------------------------
+async function answerFreeText(from, name, text, lang, normalizedText) {
+  // 1. Só um cumprimento ("olá", "bom dia", "menu") → menu principal.
   // Mensagens com mais conteúdo ("oi, quanto custa bobes?") seguem para a IA.
   if (isGreetingOnly(normalizedText)) {
     logger.info("Trigger de menu detectado", { from, text });
@@ -450,8 +567,12 @@ async function handleText(from, name, text, lang) {
     return;
   }
 
-  // D. Conversa livre: a IA responde com o contexto da conversa
-  const aiResponse = await aiService.getAIResponse(from, text, { name: firstName(name) });
+  // 2. Conversa livre: a IA responde com o contexto da conversa
+  const promo = promoService.promoText();
+  const aiResponse = await aiService.getAIResponse(from, text, {
+    name: firstName(name),
+    extra: promo ? `PROMOÇÕES ACTIVAS (podes mencioná-las quando fizer sentido):\n${promo}` : "PROMOÇÕES ACTIVAS: nenhuma de momento. Não prometas descontos.",
+  });
   if (aiResponse) {
     logger.info("Resposta da IA", { from });
     await whatsappService.sendTextMessage(from, aiResponse);
@@ -461,13 +582,13 @@ async function handleText(from, name, text, lang) {
   // Sem IA (sem chave ou erro): respostas prontas por palavra-chave
   logger.info("IA indisponível — a usar o FAQ", { from });
 
-  // E. Keywords de solicitação de atendimento humano
+  // 3. Keywords de solicitação de atendimento humano
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.humanTriggers)) {
     await sendTeamContact(from, lang);
     return;
   }
 
-  // F. Keywords de reclamação
+  // 4. Keywords de reclamação
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.complaintTriggers)) {
     await sendTeamContact(from, lang, lang === "en"
       ? "😔 We're sorry about that. Please tell the salon manager what happened; we'll handle it with priority. 💖"
@@ -475,7 +596,16 @@ async function handleText(from, name, text, lang) {
     return;
   }
 
-  // G. Busca no FAQ
+  // 5. Promoções
+  if (containsTrigger(normalizedText, KEYWORD_FLOWS.promoTriggers)) {
+    const promo = promoService.promoText();
+    await sendWithNextStep(from, promo
+      ? `${promo}\n\nQuer aproveitar? Toque em *Marcar*. 💖`
+      : "De momento não temos promoções activas, mas fique atento! 💖 Posso ajudar com preços ou com uma marcação?", lang);
+    return;
+  }
+
+  // 6. Busca no FAQ
   const faqAnswer = faqService.findAnswer(text);
   if (faqAnswer) {
     await sendWithNextStep(from, faqAnswer, lang);
@@ -484,7 +614,7 @@ async function handleText(from, name, text, lang) {
     return;
   }
 
-  // H. Pergunta de preço sem resposta: nunca inventar
+  // 7. Pergunta de preço sem resposta: nunca inventar
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.priceTriggers)) {
     await sendTeamContact(from, lang, lang === "en"
       ? "💖 The price depends on the service and style. Please confirm with our team (you can send a photo of the look you want)."
@@ -492,7 +622,10 @@ async function handleText(from, name, text, lang) {
     return;
   }
 
-  await whatsappService.sendTextMessage(from, FALLBACK[lang] || FALLBACK.pt);
+  // 8. Nada encaixou: pede para reformular e mostra o próximo passo
+  await sendWithNextStep(from, lang === "en"
+    ? "I'm not sure I understood 🙈 Could you write it another way? You can also see the options or talk to our team."
+    : "Não tenho a certeza de ter percebido 🙈 Pode escrever de outra forma? Também pode ver as opções ou falar com a equipa.", lang);
 }
 
 // ============================================================

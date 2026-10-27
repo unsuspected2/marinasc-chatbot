@@ -11,3 +11,8 @@ node_modules/
 
 # logs do bot (podem ter números de clientes)
 logs/
+
+# dados do bot com números e nomes de clientes (data/promocoes.json vai para o git)
+data/*.json
+!data/promocoes.json
+data/*.tmp

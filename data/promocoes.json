@@ -1,0 +1,10 @@
+{
+  "_ajuda": "Promoções que o bot mostra no menu e usa nas respostas. Para ligar uma, ponha \"activa\": true. \"ate\" (AAAA-MM-DD) é o último dia; sem \"ate\" fica até a desligar. Também pode mudar pelo WhatsApp 946 397 096 com /promo texto ou /promo off.",
+  "promocoes": [
+    {
+      "texto": "Exemplo: sobrancelhas grátis na aplicação de pestanas, de segunda a quinta",
+      "activa": false,
+      "ate": "2026-12-31"
+    }
+  ]
+}

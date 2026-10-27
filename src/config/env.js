@@ -36,6 +36,10 @@ const config = {
   openaiApiKey: process.env.OPENAI_API_KEY || "", // opcional; sem ela o fallback de IA é desabilitado
   openaiModel: process.env.OPENAI_MODEL || "gpt-4o-mini",
 
+  // --- Admin ---
+  // Números que podem usar /stats, /promo, /pausa e /retomar (separados por vírgula)
+  adminNumbers: (process.env.ADMIN_NUMBERS || "244946397096").split(",").map(n => n.replace(/\D/g, "")).filter(Boolean),
+
   // --- Comportamento ---
   defaultLanguage: process.env.DEFAULT_LANGUAGE || "pt",
   debug: process.env.DEBUG === "true",

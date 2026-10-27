@@ -10,6 +10,10 @@
 //   [menu_1] / [btn_marcar]   → tocar numa opção da lista ou num botão
 //   (foto)                    → enviar uma foto
 //   (áudio) quero marcar…     → enviar um áudio; o texto faz de transcrição
+//   (equipa) /stats           → mensagem enviada do 946 397 096 (comandos de admin)
+//
+// As marcações e estatísticas da simulação ficam numa pasta temporária,
+// não em data/ (as promoções reais são copiadas para lá).
 //
 // A OpenAI só é chamada se OPENAI_API_KEY estiver no .env.
 // ============================================================
@@ -19,6 +23,13 @@ process.env.VERIFY_TOKEN ||= "simulacao";
 process.env.WHATSAPP_TOKEN ||= "simulacao";
 process.env.PHONE_NUMBER_ID ||= "simulacao";
 process.env.LOG_FILE = "off"; // a simulação não suja o logs/bot.log
+
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), "marinasc-simulacao-"));
+const promos = path.join(__dirname, "../data/promocoes.json");
+if (fs.existsSync(promos)) fs.copyFileSync(promos, path.join(process.env.DATA_DIR, "promocoes.json"));
 
 const whatsappService = require("../src/services/whatsappService");
 const aiService = require("../src/services/aiService");
@@ -43,22 +54,38 @@ const EXEMPLOS = [
   "Olá",
   "[menu_1]",
   "quanto custa cordoletes com cachos?",
-  "oi, qual é o preço das sobrancelhas?",
-  "Qual é o horário de domingo?",
   "qt custa sobrancelas?",
-  "[btn_equipa]",
-  "fazem box braids?",
   "quanto fica um corte degradê?",
   "(foto)",
   "(áudio) quanto custa as unhas de gel?",
-  "quero falar com uma pessoa",
+  // Pré-marcação completa
+  "[btn_marcar]",
+  "cordoletes com cachos",
+  "[book_dia_amanha]",
+  "22h",
+  "10h",
+  "[book_nome_perfil]",
+  // Marcação já com serviço e dia na mensagem; cancelada a meio
+  "quero marcar unhas de gel para sábado",
+  "cancelar",
+  // Comandos da equipa (só do 946)
+  "(equipa) /promo 10% de desconto nas tranças até sexta",
+  "tem promoção?",
+  "(equipa) /stats",
+  "(equipa) /pausa",
+  "Olá",
+  "Ainda está aí?",
+  "(equipa) /retomar",
+  "/stats",
 ];
 
 let contador = 0;
 
 // Converte a mensagem de teste no payload que a Meta enviaria
 function message(text, id) {
-  const base = { id, from: "244900000000" };
+  const fromTeam = text.startsWith("(equipa) ");
+  if (fromTeam) text = text.slice("(equipa) ".length);
+  const base = { id, from: fromTeam ? "244946397096" : "244900000000" };
   let m;
   if ((m = /^\[(\w+)\]$/.exec(text))) {
     const reply = { id: m[1], title: m[1] };
