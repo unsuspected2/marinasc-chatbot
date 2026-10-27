@@ -4,7 +4,8 @@ O bot usa o número **955 705 188**, só para atendimento automático. A equipa 
 no WhatsApp Business do salão (**946 397 096**), que não é tocado. Sempre que o cliente quer marcar,
 reclamar ou falar com uma pessoa, o bot envia-o para o 946 397 096.
 
-Nunca envies tokens ou chaves por mensagem. Ficam só no ficheiro `.env` do teu PC.
+Nunca envies tokens ou chaves por mensagem. Ficam só no ficheiro `.env` do teu PC e nos segredos da
+Cloudflare.
 
 ## 1. Preparar o chip 955 705 188
 
@@ -35,7 +36,7 @@ Nunca envies tokens ou chaves por mensagem. Ficam só no ficheiro `.env` do teu 
 - [ ] **Gerar token** para a app, com as permissões `whatsapp_business_messaging` e
       `whatsapp_business_management`. Copia o token (só aparece uma vez).
 
-## 5. Preencher o `.env` no PC
+## 5. Preencher o `.env` no PC (para testar e publicar)
 
 ```bash
 cp .env.example .env
@@ -48,27 +49,29 @@ Preenche no `.env`:
 - `VERIFY_TOKEN` = uma palavra secreta inventada por ti (ex.: marinasc-2026-xyz)
 - `GROQ_API_KEY` = chave gratuita do Groq, em https://console.groq.com/keys (opcional; sem ela o bot responde só com o FAQ)
 
-Testa: `npm run simular` e depois `npm start`. Em http://localhost:3100/health deve aparecer `"status":"ok"`.
+Testa: `npm run simular`.
 
-## 6. Pôr o bot acessível na internet (Cloudflare Tunnel, como no ClipForge)
+## 6. Publicar o bot na Cloudflare
 
-A Meta precisa de um endereço HTTPS público.
+Os mesmos valores vão para os segredos da Cloudflare, e o bot é publicado com o site
+(passo a passo em [CLOUDFLARE.md](CLOUDFLARE.md#segredos)):
 
-- **Teste rápido** (o endereço muda sempre que reinicias):
-  ```bash
-  cloudflared tunnel --url http://localhost:3100
-  ```
-  Usa o endereço `https://….trycloudflare.com` que aparecer.
-- **Definitivo:** túnel com nome no teu domínio, como serviço que arranca com o PC. Passo a passo em
-  [ARRANQUE-AUTOMATICO.md](ARRANQUE-AUTOMATICO.md#2-túnel-com-nome-no-teu-domínio).
+```bash
+npx wrangler secret put WHATSAPP_TOKEN
+npx wrangler secret put VERIFY_TOKEN
+npx wrangler secret put GROQ_API_KEY
+npm run deploy
+```
 
-O bot usa a porta 3100 (a 3000 é do ClipForge) e só responde enquanto o PC e o túnel estiverem ligados.
+Em https://marinasc.marinasc-chatbot.workers.dev/health deve aparecer `"status":"ok"`.
 
 ## 7. Registar o webhook na Meta
 
 - [ ] Na app → **WhatsApp → Configuration → Webhook → Edit**.
-- [ ] Callback URL: `https://<endereço-do-passo-6>/webhook`
+- [ ] Callback URL: `https://marinasc.marinasc-chatbot.workers.dev/webhook`
 - [ ] Verify token: o mesmo `VERIFY_TOKEN` do `.env` → **Verify and save**.
+- [ ] Copia o **Segredo da app** (Definições da app → Básico) para `npx wrangler secret put APP_SECRET`
+      e corre `npm run deploy`: o bot passa a aceitar só pedidos assinados pela Meta.
 - [ ] Em **Webhook fields**, subscreve **messages**.
 
 ## 8. Testar

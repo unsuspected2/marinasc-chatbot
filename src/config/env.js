@@ -27,7 +27,7 @@ function aiConfig() {
         provider: "Groq",
         apiKey: groqKey,
         baseURL: "https://api.groq.com/openai/v1",
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         transcribeModel: "whisper-large-v3-turbo",
       }
     : {
@@ -45,6 +45,9 @@ function aiConfig() {
 }
 
 const config = {
+  // "cloudflare" no Worker (src/worker.js), "node" no PC
+  runtime: typeof navigator !== "undefined" && navigator.userAgent === "Cloudflare-Workers" ? "cloudflare" : "node",
+
   // --- Servidor ---
   port: parseInt(process.env.PORT || "3000", 10),
 

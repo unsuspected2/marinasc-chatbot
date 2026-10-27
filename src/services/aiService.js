@@ -15,6 +15,7 @@ const { toFile } = require("openai");
 const config = require("../config/env");
 const logger = require("../utils/logger");
 const horario = require("../utils/horario");
+const store = require("../utils/store");
 
 // -------------------------------------------------------
 // Inicialização do cliente (o SDK da OpenAI também fala com o Groq)
@@ -30,14 +31,14 @@ if (config.ai.apiKey) {
 }
 
 // -------------------------------------------------------
-// Memória de conversa: Map<phoneNumber → { messages, updatedAt }>
+// Memória de conversa: número → { messages, updatedAt }
 // Guarda as últimas MAX_HISTORY mensagens; esquece ao fim de 24 h
-// sem conversa. Fica só em memória (perde-se se o bot reiniciar).
+// sem conversa.
 // -------------------------------------------------------
-const conversationMemory = new Map();
 let aiPausedUntil = 0; // sem créditos ou limite diário esgotado: o bot usa só o FAQ por uns minutos
 const MAX_HISTORY = 10; // mensagens (cliente + bot) guardadas por cliente
 const MEMORY_TTL_MS = 24 * 60 * 60 * 1000;
+const conversationMemory = store.persistentMap("memoria.json", MEMORY_TTL_MS);
 
 // -------------------------------------------------------
 // Prompt do sistema — define a "personalidade" do bot
@@ -122,14 +123,9 @@ function detectLanguage(text) {
 // -------------------------------------------------------
 function getHistory(userId) {
   const entry = conversationMemory.get(userId);
-  if (entry && Date.now() - entry.updatedAt < MEMORY_TTL_MS) return entry.messages;
+  if (entry) return entry.messages;
 
-  // Limpeza ocasional de conversas antigas
-  if (conversationMemory.size > 2000) {
-    for (const [id, e] of conversationMemory) {
-      if (Date.now() - e.updatedAt >= MEMORY_TTL_MS) conversationMemory.delete(id);
-    }
-  }
+  // (as conversas com mais de 24 h desaparecem ao gravar)
   const fresh = { messages: [], updatedAt: Date.now() };
   conversationMemory.set(userId, fresh);
   return fresh.messages;
@@ -149,6 +145,7 @@ function addToHistory(userId, role, content) {
   }
   // A conversa enviada à OpenAI começa sempre por uma mensagem do cliente
   while (history.length && history[0].role !== "user") history.shift();
+  conversationMemory.save();
 }
 
 // -------------------------------------------------------
@@ -211,6 +208,8 @@ async function getAIResponse(userId, userMessage, context = {}) {
       messages,
       max_tokens: 300,           // resposta curta e objetiva
       temperature: 0.5,          // natural, mas fiel à tabela de preços
+      // Os gpt-oss pensam antes de responder: pouco, para ser rápido e caber nos 300
+      ...(config.ai.model.includes("gpt-oss") && { reasoning_effort: "low" }),
     });
 
     const assistantMessage = completion.choices[0].message.content.trim();
@@ -230,6 +229,7 @@ async function getAIResponse(userId, userMessage, context = {}) {
     const history = getHistory(userId);
     if (history.length > 0 && history[history.length - 1].role === "user") {
       history.pop();
+      conversationMemory.save();
     }
 
     // O controller responde com o FAQ

@@ -1,5 +1,8 @@
 # Arranque automático do bot e do túnel (systemd)
 
+> **O bot agora corre na Cloudflare** ([CLOUDFLARE.md](CLOUDFLARE.md)) e não precisa deste PC.
+> Este guia só serve se um dia quiseres voltar a correr o bot no PC.
+
 Dois serviços do teu utilizador, que arrancam quando entras no PC e voltam sozinhos se caírem:
 
 | Serviço | O que faz | Ficheiro no projecto |

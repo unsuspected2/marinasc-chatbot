@@ -1,11 +1,28 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
+  // Um só Worker: o site (pasta site/) e o bot do WhatsApp (src/worker.js)
   "name": "marinasc",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "enabled": true
   },
   "assets": {
-    "directory": "site"
+    "directory": "site",
+    "binding": "ASSETS"
+  },
+  // Durable Object "Bot": trata as mensagens e guarda os dados (marcações, promoções…)
+  "durable_objects": {
+    "bindings": [{ "name": "BOT", "class_name": "Bot" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Bot"] }],
+  // Valores que não são segredo. Os segredos (WHATSAPP_TOKEN, VERIFY_TOKEN,
+  // GROQ_API_KEY…) vão com: npx wrangler secret put NOME
+  "vars": {
+    "PHONE_NUMBER_ID": "1379062218622113",
+    "GRAPH_API_VERSION": "v22.0",
+    "ADMIN_NUMBERS": "244946397096",
+    "DEFAULT_LANGUAGE": "pt"
   }
 }

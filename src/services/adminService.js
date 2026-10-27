@@ -3,6 +3,7 @@
 // Comandos da equipa, só aceites dos números em ADMIN_NUMBERS
 // (por omissão o WhatsApp do salão, 946 397 096):
 //   /stats            conversas e pré-marcações de hoje e da semana
+//   /marcacoes        as últimas 10 pré-marcações
 //   /promo texto      define a promoção activa (/promo off desliga)
 //   /pausa, /retomar  desliga e volta a ligar o bot para os clientes
 //   /admin            lista estes comandos
@@ -33,7 +34,7 @@ function formatSummary(title, s) {
   return `*${title}*\n   💬 ${s.conversas} conversa(s), ${s.mensagens} mensagem(ns)\n   📅 ${s.marcacoes} pré-marcação(ões)${top}`;
 }
 
-const HELP = "🛠️ *Comandos da equipa*\n\n/stats: conversas e pré-marcações\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender";
+const HELP = "🛠️ *Comandos da equipa*\n\n/stats: conversas e pré-marcações\n/marcacoes: as últimas 10 pré-marcações\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender";
 
 // -------------------------------------------------------
 // Devolve o texto da resposta, ou null se não for comando de admin
@@ -54,6 +55,14 @@ function handleCommand(from, text) {
       return `📊 *Estatísticas do bot*\n\n${formatSummary("Hoje", hoje)}\n\n${formatSummary("Últimos 7 dias", semana)}\n\n`
         + `🤖 Bot: ${isPaused() ? "⏸️ em pausa (/retomar para ligar)" : "✅ a atender"}\n`
         + `🎉 Promoção: ${promo ? promo.replace(/^🎉 /gm, "") : "nenhuma"}`;
+    }
+
+    case "/marcacoes":
+    case "/marcações": {
+      const ultimas = store.readJson("marcacoes.json", []).slice(-10).reverse();
+      if (!ultimas.length) return "Ainda não há pré-marcações.";
+      return `📅 *Últimas pré-marcações*\n\n${ultimas.map(m =>
+        `• ${m.nome}: ${m.servico}, ${m.dia.split("-").reverse().join("/")} ${m.hora}\n   wa.me/${m.cliente} (pedido a ${m.dataPedido.split("-").reverse().join("/")})`).join("\n")}`;
     }
 
     case "/promo": {

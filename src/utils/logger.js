@@ -9,8 +9,8 @@ const fs = require("fs");
 const path = require("path");
 const config = require("../config/env");
 
-// Cores ANSI para o terminal
-const COLORS = {
+// Cores ANSI para o terminal (nos logs da Cloudflare ficavam como lixo)
+const COLORS = config.runtime === "cloudflare" ? new Proxy({}, { get: () => "" }) : {
   reset: "\x1b[0m",
   gray: "\x1b[90m",
   green: "\x1b[32m",
@@ -22,12 +22,13 @@ const COLORS = {
 
 // -------------------------------------------------------
 // Ficheiro de log: logs/bot.log, roda para bot.log.1 aos 5 MB.
-// LOG_FILE=off desliga (o simulador usa isto).
+// LOG_FILE=off desliga (o simulador usa isto). Na Cloudflare não há
+// ficheiro: os logs ficam no painel (Workers → marinasc → Logs).
 // -------------------------------------------------------
-const LOG_DIR = path.join(__dirname, "../../logs");
+const LOG_DIR = typeof __dirname !== "undefined" ? path.join(__dirname, "../../logs") : "logs";
 const LOG_PATH = path.join(LOG_DIR, "bot.log");
 const MAX_LOG_BYTES = 5 * 1024 * 1024;
-const fileEnabled = process.env.LOG_FILE !== "off";
+const fileEnabled = process.env.LOG_FILE !== "off" && config.runtime === "node";
 
 if (fileEnabled) fs.mkdirSync(LOG_DIR, { recursive: true });
 

@@ -14,6 +14,7 @@
 //  9. Sem IA: keywords de fluxos especiais e FAQ
 // ============================================================
 
+const config          = require("../config/env");
 const whatsappService = require("../services/whatsappService");
 const faqService      = require("../services/faqService");
 const aiService       = require("../services/aiService");
@@ -23,6 +24,7 @@ const statsService    = require("../services/statsService");
 const adminService    = require("../services/adminService");
 const horario         = require("../utils/horario");
 const logger          = require("../utils/logger");
+const store           = require("../utils/store");
 
 const TEAM_URL = "https://wa.me/244946397096";
 
@@ -117,21 +119,17 @@ const FALLBACK = {
 // Mensagens já tratadas (message.id → hora). A Meta pode reenviar
 // o mesmo evento; assim o cliente nunca recebe a resposta duas vezes.
 // -------------------------------------------------------
-const seenMessages = new Map();
 const SEEN_TTL_MS = 24 * 60 * 60 * 1000;
+const seenMessages = store.persistentMap("mensagens-vistas.json", SEEN_TTL_MS);
 
 function isDuplicate(messageId) {
-  const now = Date.now();
-  if (seenMessages.size > 5000) {
-    for (const [id, at] of seenMessages) if (now - at > SEEN_TTL_MS) seenMessages.delete(id);
-  }
   if (seenMessages.has(messageId)) return true;
-  seenMessages.set(messageId, now);
+  seenMessages.set(messageId, { updatedAt: Date.now() });
   return false;
 }
 
 // Clientes que já receberam o aviso de pausa (limpa quando o bot retoma)
-const pausedNotified = new Set();
+const pausedNotified = store.persistentMap("aviso-pausa.json");
 
 // -------------------------------------------------------
 // Comandos especiais do sistema
@@ -448,7 +446,7 @@ async function handleIncomingMessage(req, res) {
     // Bot em pausa (/pausa): só o link da equipa, uma vez por cliente
     if (adminService.isPaused() && !adminService.isAdmin(from)) {
       if (!pausedNotified.has(from)) {
-        pausedNotified.add(from);
+        pausedNotified.set(from, { updatedAt: Date.now() });
         await sendTeamContact(from, "pt", "💖 Olá! Fale connosco directamente no WhatsApp do salão, 946 397 096.");
       }
       return;
@@ -639,7 +637,7 @@ function verifyWebhook(req, res) {
 
   logger.info("Requisição de verificação do webhook recebida", { mode });
 
-  if (mode === "subscribe" && token === require("../config/env").verifyToken) {
+  if (mode === "subscribe" && token === config.verifyToken) {
     logger.info("✅ Webhook verificado com sucesso!");
     return res.status(200).send(challenge); // retorna o challenge como texto
   }

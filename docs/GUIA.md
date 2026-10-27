@@ -1,14 +1,13 @@
 # Guia do bot MARINASC
 
 Guia para o dia a dia: mudar preços, promoções e horário, e o que fazer se o bot parar.
-Os ficheiros abrem-se no VS Code. Depois de mudar um ficheiro em `src/`, reinicia o bot:
+O bot corre na Cloudflare ([CLOUDFLARE.md](CLOUDFLARE.md)), não neste PC. Os ficheiros abrem-se no
+VS Code; depois de mudar um ficheiro em `src/` ou `site/`, publica a alteração:
 
 ```bash
-systemctl --user restart marinasc-bot
+npm run simular    # confirma que não estragaste nada (conversas de exemplo, sem enviar nada a ninguém)
+npm run deploy     # publica o bot e o site
 ```
-
-Para confirmar que não estragaste nada antes de reiniciar: `npm run simular` (mostra conversas de
-exemplo no terminal, sem enviar nada a ninguém).
 
 ---
 
@@ -40,8 +39,8 @@ Pelo WhatsApp do salão (946 397 096), envia ao bot (955 705 188):
 | `/promo` | mostra a promoção actual |
 | `/promo off` | desliga as promoções |
 
-Ou edita **`data/promocoes.json`** (não precisa de reiniciar): `"activa": true` liga, `"ate": "2026-12-31"`
-é o último dia (no dia seguinte desaparece sozinha).
+As promoções ficam guardadas na Cloudflare (o ficheiro `data/promocoes.json` só é usado quando o bot
+corre no PC).
 
 O bot mostra a promoção no menu, responde a quem perguntar por promoções e a IA pode mencioná-la.
 
@@ -64,12 +63,13 @@ Só funcionam a partir do 946 397 096 (ou dos números em `ADMIN_NUMBERS` no `.e
 | Comando | Para quê |
 |---|---|
 | `/stats` | conversas e pré-marcações de hoje e dos últimos 7 dias, serviços mais pedidos |
+| `/marcacoes` | as últimas 10 pré-marcações, com o link para o WhatsApp de cada cliente |
 | `/promo …` | promoções (ver acima) |
 | `/pausa` | o bot deixa de atender: cada cliente recebe uma vez o link do 946 |
 | `/retomar` | o bot volta a atender |
 | `/admin` | lista estes comandos |
 
-As pré-marcações ficam em `data/marcacoes.json` (nome, serviço, dia, hora e número do cliente).
+As pré-marcações (nome, serviço, dia, hora e número do cliente) vêem-se com `/marcacoes`.
 **A vaga só fica marcada quando a equipa confirma no 946**: o bot nunca confirma sozinho.
 
 ---
@@ -78,32 +78,29 @@ As pré-marcações ficam em `data/marcacoes.json` (nome, serviço, dia, hora e 
 
 Vai por esta ordem:
 
-1. **O PC está ligado e com sessão iniciada?** O bot corre neste PC.
-2. **O bot está a correr?**
+1. **O bot está no ar?** Abre https://marinasc.marinasc-chatbot.workers.dev/health no browser. Deve
+   aparecer `"status":"ok"`. Se não aparecer, vê o estado da Cloudflare em https://www.cloudflarestatus.com
+2. **O que diz o registo?** Em https://dash.cloudflare.com → **Workers & Pages → marinasc → Logs**, ou
+   no terminal, em directo, enquanto alguém manda uma mensagem:
    ```bash
-   systemctl --user status marinasc-bot
-   ```
-   Se não disser `active (running)`: `systemctl --user restart marinasc-bot`.
-3. **O que diz o registo?**
-   ```bash
-   tail -n 50 /run/media/josaid/4A2EE4DC2EE4C255/main_web/marinasc-chatbot/logs/bot.log
+   npx wrangler tail marinasc --format pretty
    ```
    - `Status: 401` ou `Invalid OAuth access token` → o token da Meta deixou de valer. Gera um novo
-     (Utilizadores do sistema, ver `docs/LIGAR-WHATSAPP.md`, passo 4), põe-no no `.env` e reinicia.
+     (Utilizadores do sistema, ver `docs/LIGAR-WHATSAPP.md`, passo 4) e põe-no com
+     `npx wrangler secret put WHATSAPP_TOKEN` (fica logo activo).
    - `Groq: sem créditos ou limite atingido` → passou o limite gratuito do Groq (cerca de 1.000 conversas
      com IA por dia). O bot continua com as respostas prontas e tenta a IA outra vez 10 minutos depois;
      o limite renova-se sozinho no dia seguinte. Se acontecer todos os dias, ver os limites em
      https://console.groq.com/settings/limits
-   - `Status: 401` com `groq` → a chave do Groq foi apagada: cria outra em https://console.groq.com/keys,
-     põe-na em `GROQ_API_KEY` no `.env` e reinicia.
-   - `ETIMEDOUT` / `ENETUNREACH` → sem internet no PC.
-   - Não aparece nada quando mandas uma mensagem → o problema está antes do bot (passo 4).
-4. **O túnel está ligado?** Abre no browser o endereço do bot com `/health` no fim
-   (ex.: `https://bot.o-teu-dominio.com/health`). Deve aparecer `"status":"ok"`.
-   - Com o túnel com nome: `systemctl --user restart marinasc-tunnel`.
-   - Com o túnel rápido (`trycloudflare.com`): se o terminal fechou, o endereço mudou. Corre de novo
-     `cloudflared tunnel --url http://localhost:3100` e põe o novo endereço na Meta (Configuração →
-     Webhook → Callback URL, terminado em `/webhook`).
+   - `Status: 401` com `groq` → a chave do Groq foi apagada: cria outra em https://console.groq.com/keys
+     e põe-na com `npx wrangler secret put GROQ_API_KEY`.
+   - `sem assinatura válida da Meta` em todas as mensagens → o `APP_SECRET` não é o da app: copia-o outra
+     vez (Definições da app → Básico) com `npx wrangler secret put APP_SECRET`.
+   - Não aparece nada quando mandas uma mensagem → a Meta não está a enviar para o bot (passos 3 e 4).
+3. **O webhook está certo?** Na Meta (app → WhatsApp → Configuração → Webhook), o Callback URL tem de ser
+   `https://marinasc.marinasc-chatbot.workers.dev/webhook`, com o campo **messages** subscrito.
+4. **O número está ligado à app?** Se o 955 foi registado de novo ou mudou de conta, é preciso voltar a
+   ligar a app à conta WhatsApp (docs/LIGAR-WHATSAPP.md).
 5. **A app da Meta está "Ao vivo"?** Em developers.facebook.com → a app → interruptor no topo. Em
    "Desenvolvimento" a Meta não entrega mensagens de clientes.
 6. **O bot foi posto em pausa?** Manda `/stats` do 946: se disser "em pausa", manda `/retomar`.
@@ -115,4 +112,5 @@ Enquanto o bot estiver parado, os clientes podem sempre falar com a equipa no 94
 ## Mais documentação
 
 - `docs/LIGAR-WHATSAPP.md`: ligação à Meta (número, token, webhook).
-- `docs/ARRANQUE-AUTOMATICO.md`: serviços que arrancam com o PC e túnel com nome.
+- `docs/CLOUDFLARE.md`: onde o bot corre, segredos, publicar, logs.
+- `docs/ARRANQUE-AUTOMATICO.md`: (opcional) correr o bot no PC em vez da Cloudflare.

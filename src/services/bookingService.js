@@ -16,7 +16,7 @@ const TEAM_NUMBER = "244946397096";
 const FLOW_TTL_MS = 2 * 60 * 60 * 1000; // uma pré-marcação parada 2 h recomeça
 
 // Conversas a meio de uma pré-marcação: número → { step, servico, dia, hora, nome, updatedAt }
-const flows = new Map();
+const flows = store.persistentMap("marcacoes-a-meio.json", FLOW_TTL_MS);
 
 // -------------------------------------------------------
 // Catálogo de serviços: as linhas "• Nome: preço" do FAQ e mais
@@ -133,7 +133,7 @@ const toMin = hhmm => hhmm.split(":").map(Number).reduce((h, m) => h * 60 + m);
 // -------------------------------------------------------
 function getFlow(from) {
   const f = flows.get(from);
-  if (f && Date.now() - f.updatedAt < FLOW_TTL_MS) return f;
+  if (f) return f;
   flows.delete(from);
   return null;
 }
@@ -208,6 +208,7 @@ function answer(from, text, { interactiveId, profileName } = {}) {
   const f = getFlow(from);
   if (!f) return null;
   f.updatedAt = Date.now();
+  flows.save(); // o passo seguinte pode chegar daqui a minutos, noutro arranque
   const value = (text || "").trim();
 
   switch (nextStep(f)) {
@@ -248,7 +249,10 @@ function answer(from, text, { interactiveId, profileName } = {}) {
       break;
   }
 
-  if (nextStep(f) !== "fim") return { reply: prompt(f, profileName) };
+  if (nextStep(f) !== "fim") {
+    flows.save();
+    return { reply: prompt(f, profileName) };
+  }
 
   // Pedido pronto
   flows.delete(from);

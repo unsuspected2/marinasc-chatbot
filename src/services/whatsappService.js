@@ -11,21 +11,44 @@
 //  - parseIncomingMessage → extrai dados do payload do webhook
 // ============================================================
 
-const axios = require("axios");
 const config = require("../config/env");
 const logger = require("../utils/logger");
 
 // -------------------------------------------------------
-// Cliente Axios pré-configurado para a Graph API
+// Pedido à Graph API com fetch (funciona no PC e na Cloudflare).
+// Erro com resposta da Meta → err.response = { status, data };
+// erro de rede ou tempo esgotado → sem err.response.
 // -------------------------------------------------------
-const graphApi = axios.create({
-  baseURL: config.graphApiUrl,
-  headers: {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${config.whatsappToken}`,
-  },
-  timeout: 10000, // 10 segundos de timeout
-});
+async function request(method, url, { body, timeout = 10000, raw = false } = {}) {
+  const res = await fetch(url.startsWith("http") ? url : config.graphApiUrl + url, {
+    method,
+    headers: {
+      Authorization: `Bearer ${config.whatsappToken}`,
+      ...(body && { "Content-Type": "application/json" }),
+    },
+    body: body && JSON.stringify(body),
+    signal: AbortSignal.timeout(timeout),
+  });
+  if (raw && res.ok) return { data: await res.arrayBuffer(), headers: res.headers };
+  const text = await res.text();
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = text;
+  }
+  if (!res.ok) {
+    const err = new Error(`Graph API respondeu ${res.status}`);
+    err.response = { status: res.status, data };
+    throw err;
+  }
+  return { data };
+}
+
+const graphApi = {
+  get: (url, opts) => request("GET", url, opts),
+  post: (url, body, opts) => request("POST", url, { ...opts, body }),
+};
 
 // -------------------------------------------------------
 // POST com novas tentativas quando a rede falha (sem resposta da Meta).
@@ -37,7 +60,7 @@ async function postWithRetry(url, payload, attempts = 3) {
       return await graphApi.post(url, payload);
     } catch (err) {
       if (err.response || i >= attempts) throw err;
-      logger.warn(`Rede falhou ao contactar a Meta (tentativa ${i}/${attempts})`, { code: err.code });
+      logger.warn(`Rede falhou ao contactar a Meta (tentativa ${i}/${attempts})`, { erro: err.cause?.code || err.name });
       await new Promise(r => setTimeout(r, 1500 * i));
     }
   }
@@ -240,12 +263,8 @@ async function sendLinkButton(to, bodyText, displayText, url) {
 // -------------------------------------------------------
 async function downloadMedia(mediaId) {
   const { data: info } = await graphApi.get(`/${mediaId}`);
-  const file = await axios.get(info.url, {
-    responseType: "arraybuffer",
-    headers: { Authorization: `Bearer ${config.whatsappToken}` },
-    timeout: 30000,
-    maxContentLength: 16 * 1024 * 1024,
-  });
+  if (info.file_size > 16 * 1024 * 1024) throw new Error(`Ficheiro grande demais (${info.file_size} bytes)`);
+  const file = await graphApi.get(info.url, { timeout: 30000, raw: true });
   return { buffer: Buffer.from(file.data), mimeType: info.mime_type };
 }
 

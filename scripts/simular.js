@@ -72,6 +72,7 @@ const EXEMPLOS = [
   "(equipa) /promo 10% de desconto nas tranças até sexta",
   "tem promoção?",
   "(equipa) /stats",
+  "(equipa) /marcacoes",
   "(equipa) /pausa",
   "Olá",
   "Ainda está aí?",

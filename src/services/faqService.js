@@ -13,7 +13,6 @@
 // estar escrito num só sítio.
 // ============================================================
 
-const path = require("path");
 const logger = require("../utils/logger");
 
 // Carrega o FAQ uma única vez em memória ao iniciar o servidor.
@@ -21,7 +20,7 @@ const logger = require("../utils/logger");
 let faqData = {};
 
 try {
-  faqData = require(path.join(__dirname, "../data/faq.json"));
+  faqData = require("../data/faq.json");
   logger.info(`FAQ carregado com ${Object.keys(faqData).length} entradas.`);
 } catch (err) {
   logger.error("Falha ao carregar faq.json", err);
@@ -132,7 +131,7 @@ function getAllFaqs() {
 function reloadFaq() {
   try {
     // Limpa o cache do require para forçar releitura
-    const faqPath = require.resolve(path.join(__dirname, "../data/faq.json"));
+    const faqPath = require.resolve("../data/faq.json");
     delete require.cache[faqPath];
     faqData = require(faqPath);
     logger.info(`FAQ recarregado com ${Object.keys(faqData).length} entradas.`);
