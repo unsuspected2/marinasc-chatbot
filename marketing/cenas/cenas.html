@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="pt-AO">
+<head>
+<meta charset="utf-8">
+<title>Cenas do vídeo MariNasc</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Cada cena é uma imagem 1080x1920; o vídeo é montado com ffmpeg (ver ../fazer-video.sh) */
+  :root { --rosa:#d63f78; --azul:#0d3b78; --dourado:#c9a24b; --creme:#fdf8f6; --texto:#1f1a2e; --wa:#0b8f5a; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html, body { width:1080px; height:1920px; overflow:hidden; font-family:Inter, sans-serif; }
+  body { background:transparent; }
+  .cena { display:none; width:1080px; height:1920px; position:relative; padding:150px 90px; }
+  .cena.on { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+  .fundo { background:linear-gradient(170deg, #fff 0%, var(--creme) 55%, #f6e3eb 100%); }
+  .escuro { background:linear-gradient(170deg, #12305e 0%, var(--azul) 50%, #3a1640 100%); color:#fff; }
+  .sobre { background:linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(10,10,30,.85) 75%); justify-content:flex-end !important; padding-bottom:230px; color:#fff; }
+  h1, h2 { font-family:"Playfair Display", serif; line-height:1.08; }
+  h1 { font-size:118px; }
+  h2 { font-size:92px; }
+  .rosa { color:var(--rosa); } .ouro { color:var(--dourado); }
+  p.sub { font-size:46px; line-height:1.35; margin-top:36px; opacity:.92; }
+  .tag { display:inline-block; font-size:36px; font-weight:700; letter-spacing:.18em; text-transform:uppercase;
+         padding:16px 34px; border-radius:999px; background:var(--rosa); color:#fff; margin-bottom:48px; }
+  .logo { width:230px; height:230px; border-radius:50%; border:6px solid var(--dourado); margin-bottom:50px; }
+  .num { margin-top:56px; font-size:76px; font-weight:700; color:#fff; background:var(--wa); padding:26px 56px; border-radius:34px; }
+
+  /* Telemóvel com a conversa do WhatsApp */
+  .tel { width:760px; margin-top:60px; border-radius:60px; background:#111; padding:22px; box-shadow:0 40px 90px rgba(13,59,120,.35); }
+  .ecra { border-radius:42px; overflow:hidden; background:#efe7dc; text-align:left; }
+  .topo { background:#075e54; color:#fff; padding:26px 30px; display:flex; align-items:center; gap:22px; font-size:34px; font-weight:600; }
+  .topo img { width:74px; height:74px; border-radius:50%; }
+  .topo small { display:block; font-size:24px; font-weight:400; opacity:.85; }
+  .conv { padding:28px 24px 34px; display:flex; flex-direction:column; gap:18px; min-height:860px; }
+  .msg { max-width:84%; padding:18px 24px; border-radius:22px; font-size:30px; line-height:1.35; box-shadow:0 2px 2px rgba(0,0,0,.08); }
+  .eu { align-self:flex-end; background:#d9fdd3; border-top-right-radius:6px; }
+  .bot { align-self:flex-start; background:#fff; border-top-left-radius:6px; }
+  .bot b { font-weight:700; }
+  .botoes { align-self:flex-start; display:flex; gap:12px; flex-wrap:wrap; max-width:92%; }
+  .botoes span { background:#fff; color:#0a7cff; font-size:28px; font-weight:600; padding:14px 22px; border-radius:18px; box-shadow:0 2px 2px rgba(0,0,0,.08); }
+
+  /* Cartões */
+  .cartoes { display:grid; gap:28px; width:100%; margin-top:60px; text-align:left; }
+  .cartao { background:#fff; border-radius:36px; padding:38px 44px; box-shadow:0 18px 40px rgba(13,59,120,.12); display:flex; gap:32px; align-items:center; }
+  .cartao .ic { font-size:84px; }
+  .cartao b { display:block; font-size:46px; color:var(--azul); }
+  .cartao span { font-size:34px; color:#5f5870; }
+  .escuro .cartao { background:rgba(255,255,255,.1); box-shadow:none; }
+  .escuro .cartao b { color:#fff; } .escuro .cartao span { color:#e4dcef; }
+
+  .site { width:820px; margin-top:56px; border-radius:36px; overflow:hidden; box-shadow:0 30px 70px rgba(13,59,120,.3); border:10px solid #fff; }
+  .site img { width:100%; display:block; }
+  .url { margin-top:40px; font-size:38px; font-weight:600; color:var(--azul); background:#fff; padding:20px 34px; border-radius:22px; }
+
+  .mapa { width:860px; height:560px; margin-top:56px; border-radius:40px; position:relative; overflow:hidden;
+          background:repeating-linear-gradient(0deg, #e9eef5 0 2px, transparent 2px 120px), repeating-linear-gradient(90deg, #e9eef5 0 2px, transparent 2px 120px), #f7f9fc;
+          box-shadow:0 30px 70px rgba(13,59,120,.25); }
+  .mapa .rua1 { position:absolute; left:-40px; right:-40px; top:250px; height:44px; background:#fff; transform:rotate(-12deg); }
+  .mapa .rua2 { position:absolute; top:-40px; bottom:-40px; left:470px; width:40px; background:#fff; transform:rotate(8deg); }
+  .mapa .pino { position:absolute; left:380px; top:110px; font-size:150px; filter:drop-shadow(0 12px 10px rgba(0,0,0,.25)); }
+  .mapa .lbl { position:absolute; left:270px; top:310px; background:var(--azul); color:#fff; font-size:36px; font-weight:700; padding:16px 30px; border-radius:20px; }
+</style>
+</head>
+<body>
+
+<!-- 1. Abertura (sobre o vídeo do salão) -->
+<section class="cena sobre" id="c1">
+  <div class="tag">Novidades</div>
+  <h1>Ficou mais fácil<br>cuidar de <span class="rosa">si</span> ✨</h1>
+  <p class="sub">Tudo o que mudou no MariNasc, em 40 segundos</p>
+</section>
+
+<!-- 2. WhatsApp 24h -->
+<section class="cena fundo on" id="c2">
+  <div class="tag">Novo · WhatsApp 24h</div>
+  <h2>Marque a <span class="rosa">qualquer hora</span>,<br>até de madrugada</h2>
+  <div class="tel"><div class="ecra">
+    <div class="topo"><img src="logo.jpg" alt=""><div>MariNasc<small>responde na hora</small></div></div>
+    <div class="conv">
+      <div class="msg eu">Boa noite! qt custa as tranças nagô?</div>
+      <div class="msg bot">💖 Boa noite! As <b>viradas nagô</b> são 11.000 Kz e levam cerca de 2h. Quer que eu prepare a marcação?</div>
+      <div class="botoes"><span>📅 Marcar</span><span>📋 Ver opções</span><span>👤 Equipa</span></div>
+      <div class="msg eu">🎤 Áudio · quero marcar para sábado</div>
+      <div class="msg bot">Combinado! Percebo áudios e erros de escrita, fale à vontade 😉</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 3. Horas livres -->
+<section class="cena fundo" id="c3">
+  <div class="tag">Sem esperas</div>
+  <h2>Veja as <span class="rosa">horas livres</span><br>e escolha a sua</h2>
+  <div class="tel"><div class="ecra">
+    <div class="topo"><img src="logo.jpg" alt=""><div>MariNasc<small>a escrever…</small></div></div>
+    <div class="conv">
+      <div class="msg bot">Sábado, 31/10. Horas livres para <b>Cordoletes</b> (cerca de 3h):</div>
+      <div class="botoes"><span>9h</span><span>10h</span><span>13h</span><span>14h</span><span>15h30</span><span>17h</span></div>
+      <div class="msg eu">10h</div>
+      <div class="msg bot">✅ <b>Pedido registado!</b><br>• Cordoletes · sábado, 10h<br>• Código: <b>#K7Q2</b><br>A vaga fica reservada para si 💖</div>
+      <div class="msg eu">E se quiser mudar?</div>
+      <div class="msg bot">Escreva <b>remarcar</b> ou <b>cancelar marcação</b>. Simples assim!</div>
+    </div>
+  </div></div>
+</section>
+
+<!-- 4. Confirmação -->
+<section class="cena escuro" id="c4">
+  <div class="tag">Confirmação</div>
+  <h2>A nossa equipa<br>confirma <span class="ouro">consigo</span></h2>
+  <div class="cartoes">
+    <div class="cartao"><div class="ic">📅</div><div><b>Nada de horas duplicadas</b><span>Cada vaga é só de uma cliente</span></div></div>
+    <div class="cartao"><div class="ic">✅</div><div><b>Confirmação no WhatsApp</b><span>Com o dia, a hora e a morada</span></div></div>
+    <div class="cartao"><div class="ic">🔁</div><div><b>Remarque ou cancele</b><span>A qualquer momento, por mensagem</span></div></div>
+  </div>
+</section>
+
+<!-- 5. Site -->
+<section class="cena fundo" id="c5">
+  <div class="tag">Novo site</div>
+  <h2>Todos os <span class="rosa">preços</span><br>num só lugar</h2>
+  <div class="site"><img src="site.png" alt=""></div>
+  <div class="url">marinasc.marinasc-chatbot.workers.dev</div>
+</section>
+
+<!-- 6. Serviços novos (sobre o vídeo do spa) -->
+<section class="cena sobre" id="c6">
+  <div class="tag">Mais serviços</div>
+  <h2>Spa, estética<br>e <span class="ouro">Barbearia</span> 💈</h2>
+  <p class="sub">Massagens · Limpeza facial · Depilação<br>Corte · Degradê · Barba</p>
+</section>
+
+<!-- 7. Redes -->
+<section class="cena escuro" id="c7">
+  <div class="tag">Siga-nos</div>
+  <h2>Os nossos <span class="ouro">trabalhos</span><br>todos os dias</h2>
+  <div class="cartoes">
+    <div class="cartao"><div class="ic">🎵</div><div><b>TikTok novo</b><span>@salo.marinasc</span></div></div>
+    <div class="cartao"><div class="ic">📸</div><div><b>Instagram</b><span>@marynasc_salao_de_beleza_</span></div></div>
+    <div class="cartao"><div class="ic">⭐</div><div><b>Google</b><span>Procure “MARINASC Kilamba” e deixe a sua avaliação</span></div></div>
+  </div>
+</section>
+
+<!-- 8. Localização -->
+<section class="cena fundo" id="c8">
+  <div class="tag">Onde estamos</div>
+  <h2>Centralidade do<br><span class="rosa">Kilamba</span></h2>
+  <div class="mapa"><div class="rua1"></div><div class="rua2"></div><div class="pino">📍</div><div class="lbl">MariNasc · C19</div></div>
+  <p class="sub" style="color:var(--texto)"><b>Edifício C19, Apt. 41, 4.º andar</b><br>Seg–Sex 8h–21h · Sáb e Dom 9h–20h</p>
+</section>
+
+<!-- 9. Fecho -->
+<section class="cena escuro" id="c9">
+  <img class="logo" src="logo.jpg" alt="">
+  <h1>Marque já 💖</h1>
+  <div class="num">📲 955 705 188</div>
+  <p class="sub">WhatsApp · 24 horas por dia<br><span class="ouro">Beleza · Cuidado · Confiança</span></p>
+</section>
+
+<script>
+  // cenas.html#c3 mostra só a cena 3
+  const id = location.hash.slice(1) || "c2";
+  document.querySelectorAll(".cena").forEach(c => c.classList.toggle("on", c.id === id));
+</script>
+</body>
+</html>

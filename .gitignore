@@ -16,3 +16,9 @@ logs/
 data/*.json
 !data/promocoes.json
 data/*.tmp
+
+# vídeos e imagens gerados por marketing/fazer-video.sh
+marketing/*.mp4
+marketing/cenas/c*.png
+marketing/cenas/site.png
+marketing/cenas/logo.jpg
