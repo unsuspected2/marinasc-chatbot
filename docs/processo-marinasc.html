@@ -1,0 +1,331 @@
+<title>Do Salão ao Chatbot MARINASC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;1,500&family=Source+Sans+3:wght@400;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: documento de leitura numa coluna, com índice lateral no ecrã largo e tabelas de estado */
+  :root {
+    --bg: #fbfaf7;
+    --surface: #f2efe7;
+    --ink: #1d1b22;
+    --muted: #5d5866;
+    --line: #ddd6c8;
+    --gold: #9a7420;
+    --gold-soft: #f3e7c6;
+    --ok: #2f6b45;
+    --ok-bg: #e2f0e6;
+    --wait: #8a5a00;
+    --wait-bg: #fbecc8;
+    --todo: #8c2f39;
+    --todo-bg: #f7dfe2;
+    --display: "Playfair Display", Georgia, "Times New Roman", serif;
+    --body: "Source Sans 3", "Segoe UI", Roboto, Arial, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #16141a; --surface: #201d25; --ink: #eeeae2; --muted: #aaa3b2; --line: #3a3541;
+      --gold: #dcb862; --gold-soft: #3a3020;
+      --ok: #8fd3a5; --ok-bg: #1f3427; --wait: #f0c56b; --wait-bg: #3b2f17; --todo: #f2a3ad; --todo-bg: #3d1f25;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #16141a; --surface: #201d25; --ink: #eeeae2; --muted: #aaa3b2; --line: #3a3541;
+    --gold: #dcb862; --gold-soft: #3a3020;
+    --ok: #8fd3a5; --ok-bg: #1f3427; --wait: #f0c56b; --wait-bg: #3b2f17; --todo: #f2a3ad; --todo-bg: #3d1f25;
+    color-scheme: dark;
+  }
+
+  body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 17px; line-height: 1.6; }
+  .pagina { max-width: 1120px; margin: 0 auto; padding-block: 48px 96px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 56px; }
+  @media (max-width: 860px) { .pagina { grid-template-columns: minmax(0, 1fr); gap: 24px; padding-block: 28px 64px; } }
+
+  nav.indice { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 24px); align-self: start; font-size: 14px; }
+  nav.indice p { font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); margin: 0 0 10px; }
+  nav.indice ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  nav.indice a { color: var(--ink); text-decoration: none; display: block; padding: 3px 0 3px 12px; border-left: 2px solid var(--line); }
+  nav.indice a:hover, nav.indice a:focus-visible { border-left-color: var(--gold); color: var(--gold); outline: none; }
+  @media (max-width: 860px) { nav.indice { position: static; } nav.indice ol { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); } }
+
+  main { min-width: 0; max-width: 72ch; }
+  header.capa { padding-bottom: 28px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+  .rotulo { font-size: 12px; letter-spacing: .18em; text-transform: uppercase; color: var(--gold); font-weight: 600; }
+  h1 { font-family: var(--display); font-weight: 500; font-size: clamp(34px, 6vw, 52px); line-height: 1.08; margin: 12px 0 16px; text-wrap: balance; }
+  h1 em, h2 em { color: var(--gold); }
+  .lead { font-size: 19px; color: var(--muted); margin: 0; }
+  .meta { margin-top: 18px; font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 20px; }
+
+  section { padding-top: 44px; scroll-margin-top: 16px; }
+  h2 { font-family: var(--display); font-weight: 500; font-size: 30px; line-height: 1.2; margin: 0 0 6px; text-wrap: balance; }
+  h2 small { display: block; font-family: var(--body); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--gold); font-weight: 600; margin-bottom: 6px; }
+  h3 { font-size: 19px; margin: 28px 0 6px; }
+  p { margin: 10px 0; }
+  ul, ol { padding-left: 22px; margin: 10px 0; }
+  li { margin: 4px 0; }
+  a { color: var(--gold); }
+  code, kbd { font-family: var(--mono); font-size: .86em; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+
+  .tabela { overflow-x: auto; margin: 16px 0; border: 1px solid var(--line); border-radius: 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); background: var(--surface); font-weight: 600; }
+  tr:last-child td { border-bottom: 0; }
+  td:first-child { font-weight: 600; }
+
+  .estado { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .feito { color: var(--ok); background: var(--ok-bg); }
+  .espera { color: var(--wait); background: var(--wait-bg); }
+  .falta { color: var(--todo); background: var(--todo-bg); }
+
+  .passos { counter-reset: passo; list-style: none; padding: 0; display: grid; gap: 18px; margin: 18px 0; }
+  .passos > li { counter-increment: passo; display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 14px; margin: 0; }
+  .passos > li::before { content: counter(passo); font-family: var(--display); font-size: 20px; color: var(--gold); border: 1px solid var(--gold); border-radius: 50%;
+    width: 34px; height: 34px; display: grid; place-items: center; }
+  .passos b { display: block; }
+
+  .nota { background: var(--gold-soft); border-radius: 8px; padding: 14px 18px; margin: 18px 0; font-size: 16px; }
+  .nota b { color: var(--ink); }
+
+  .linha-tempo { display: grid; gap: 0; margin: 18px 0; border-left: 2px solid var(--line); padding-left: 20px; }
+  .linha-tempo div { position: relative; padding: 0 0 18px; }
+  .linha-tempo div::before { content: ""; position: absolute; left: -27px; top: 8px; width: 12px; height: 12px; border-radius: 50%; background: var(--bg); border: 2px solid var(--gold); }
+  .linha-tempo time { font-family: var(--mono); font-size: 13px; color: var(--gold); display: block; font-variant-numeric: tabular-nums; }
+
+  .fluxo { overflow-x: auto; margin: 18px 0; }
+  .fluxo-grid { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .fluxo-grid div { flex: 1 1 120px; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 14px; background: var(--surface); }
+  .fluxo-grid div b { display: block; font-size: 13px; color: var(--gold); letter-spacing: .04em; }
+
+  footer { margin-top: 56px; padding-top: 20px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+  @media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+</style>
+
+<div class="pagina">
+  <nav class="indice" aria-label="Índice">
+    <p>Índice</p>
+    <ol>
+      <li><a href="#onde-estamos">Onde estamos</a></li>
+      <li><a href="#linha-do-tempo">Linha do tempo</a></li>
+      <li><a href="#empresa">1. Organizar a empresa</a></li>
+      <li><a href="#presenca">2. Presença digital</a></li>
+      <li><a href="#chatbot">3. Criar o chatbot</a></li>
+      <li><a href="#marcacoes">4. Marcações e sinal</a></li>
+      <li><a href="#equipa">5. Rotina da equipa</a></li>
+      <li><a href="#marketing">6. Marketing</a></li>
+      <li><a href="#pendentes">7. O que falta</a></li>
+      <li><a href="#ficheiros">Onde está cada coisa</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="capa">
+      <div class="rotulo">MARINASC Salão de Beleza · Kilamba, Luanda</div>
+      <h1>Do salão ao <em>chatbot</em>: o processo completo</h1>
+      <p class="lead">Como organizámos a empresa, montámos a presença digital e criámos o assistente de WhatsApp que marca clientes 24 horas por dia. Serve para a equipa perceber o sistema e para repetir o processo noutro negócio.</p>
+      <div class="meta"><span>Situação a 28/10/2026</span><span>Bot: WhatsApp 955 705 188</span><span>Equipa: WhatsApp 946 397 096</span></div>
+    </header>
+
+    <section id="onde-estamos">
+      <h2><small>Resumo</small>Onde estamos</h2>
+      <p>O bot está ligado na internet (Cloudflare), não depende de nenhum computador e responde a clientes reais. Faz marcações só em horas livres, pede o sinal de 30% e avisa a equipa.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Peça</th><th>Estado</th><th>Notas</th></tr></thead>
+        <tbody>
+          <tr><td>Bot do WhatsApp (955)</td><td><span class="estado feito">Feito</span></td><td>Na Cloudflare, sempre ligado. IA gratuita (Groq). Entende áudios.</td></tr>
+          <tr><td>Agenda e marcações</td><td><span class="estado feito">Feito</span></td><td>Só horas livres, sem sobreposições, remarcar e cancelar.</td></tr>
+          <tr><td>Sinal de 30% e faltas</td><td><span class="estado feito">Feito</span></td><td>IBAN, comprovativo reenviado à equipa, prazo de 24 h, <code>/faltou</code>.</td></tr>
+          <tr><td>Site</td><td><span class="estado feito">Feito</span></td><td>Serviços, preços, galeria, mapa. Botões "Marcar" levam ao 955.</td></tr>
+          <tr><td>Perfil do Google</td><td><span class="estado espera">Em parte</span></td><td>Horário, descrição, categorias, preços das unhas e link do menu feitos. Faltam preços da barbearia e serviços de tranças, cabelo, spa e rosto. A troca do telefone (955→946) espera verificação do Google.</td></tr>
+          <tr><td>Instagram e TikTok</td><td><span class="estado espera">Em parte</span></td><td>Bios actualizadas. As ligações do Instagram só se mudam na app do telemóvel.</td></tr>
+          <tr><td>Bot nas mensagens do Instagram</td><td><span class="estado falta">Por ligar</span></td><td>O código está pronto. Falta configurar a app da Meta (ver <code>docs/INSTAGRAM.md</code>).</td></tr>
+          <tr><td>Vídeo "Novidades"</td><td><span class="estado feito">Feito</span></td><td>37 s, vertical, para Reels e TikTok. Sem música: escolher o som na app.</td></tr>
+          <tr><td>Plano de publicações</td><td><span class="estado feito">Feito</span></td><td>Novembro, 3 publicações por semana, com legendas prontas.</td></tr>
+          <tr><td>Tráfego pago</td><td><span class="estado espera">Estudo feito</span></td><td>Recomendação: teste de 2 semanas (40.000–60.000 Kz) antes de investir mais.</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="linha-do-tempo">
+      <h2><small>Histórico</small>Linha do tempo</h2>
+      <div class="linha-tempo">
+        <div><time>26/10/2026</time>Site do salão e código base do bot. Número do bot (955) separado do número da equipa (946). Site publicado na Cloudflare.</div>
+        <div><time>27/10/2026</time>Política de privacidade para a Meta. Fases 1 a 4: estabilidade, experiência do cliente, pré-marcações, promoções e comandos da equipa. IA gratuita no Groq. Bot passa para a Cloudflare. Agenda com vagas e conflitos. Serviços novos (cabelo, spa, barbearia). Código do Instagram. Plano de publicações, guia das redes, perfil do Google, bios e TikTok novo.</div>
+        <div><time>28/10/2026</time>Vídeo "Novidades" (refeito num estilo único). Site aponta para o 955. Sinal de 30%, regra das faltas, prazo de 24 h para o comprovativo. Estudo de tráfego pago.</div>
+      </div>
+    </section>
+
+    <section id="empresa">
+      <h2><small>Parte 1</small>Organizar a empresa</h2>
+      <p>Um chatbot só responde bem se a empresa souber responder. Antes de escrever código, juntámos tudo o que a cliente pergunta e as regras que a equipa segue.</p>
+      <h3>1.1 Identidade e dados oficiais</h3>
+      <ul>
+        <li><b>Nome comercial:</b> MARINASC Salão de Beleza (Cabeleireiro · Manicure · Spa · Barbearia).</li>
+        <li><b>Empresa:</b> MARINASC - Comércio e Prestação de Serviços, Lda · NIF 5000559687.</li>
+        <li><b>Morada:</b> Centralidade do Kilamba, Edifício C19, Apartamento 41, 4.º andar, Luanda.</li>
+        <li><b>Email oficial:</b> marinasc.official1@gmail.com. É o dono das contas (Google, Meta). As contas pessoais saem como proprietárias.</li>
+        <li><b>Marca visual:</b> logótipo dourado, branco e dourado no vídeo e nas publicações.</li>
+      </ul>
+      <h3>1.2 Contactos com papéis claros</h3>
+      <div class="tabela"><table>
+        <thead><tr><th>Contacto</th><th>Para quê</th></tr></thead>
+        <tbody>
+          <tr><td>WhatsApp 955 705 188</td><td>O bot: perguntas, preços e marcações, 24 horas. É o número que se divulga para marcar.</td></tr>
+          <tr><td>WhatsApp 946 397 096</td><td>A equipa: confirma marcações, recebe comprovativos, dá os comandos ao bot, trata reclamações.</td></tr>
+          <tr><td>Telefone 921 610 705</td><td>Chamadas.</td></tr>
+        </tbody>
+      </table></div>
+      <h3>1.3 Serviços, preços e durações</h3>
+      <p>Cada serviço tem nome, preço (tabela "Cartaz dourado" na barbearia) e duração aproximada. As áreas têm um número de profissionais, e isso define quantas clientes se atendem à mesma hora.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Área</th><th>Profissionais</th><th>Duração normal</th></tr></thead>
+        <tbody>
+          <tr><td>Tranças e penteados</td><td>2</td><td>3 h</td></tr>
+          <tr><td>Cabelo</td><td>1</td><td>1 h 30</td></tr>
+          <tr><td>Unhas</td><td>1</td><td>1 h</td></tr>
+          <tr><td>Spa e estética</td><td>1</td><td>1 h</td></tr>
+          <tr><td>Rosto (sobrancelhas, pestanas)</td><td>1</td><td>30 min</td></tr>
+          <tr><td>Barbearia</td><td>1</td><td>30 min, horário próprio</td></tr>
+        </tbody>
+      </table></div>
+      <h3>1.4 Horário</h3>
+      <ul>
+        <li><b>Salão:</b> segunda a sexta, 08h00–21h00. Sábado e domingo, 09h00–20h00.</li>
+        <li><b>Barbearia:</b> segunda a sexta, 08h30–19h30. Sábado, 08h30–17h30. Domingo fechada.</li>
+        <li>O mesmo horário está no bot, no site e no Google. Se mudar, muda nos três.</li>
+      </ul>
+      <h3>1.5 Regras de marcação</h3>
+      <ul>
+        <li>Marcações com pelo menos 1 hora de antecedência, de 30 em 30 minutos.</li>
+        <li><b>Sinal de 30%</b> do valor do serviço por transferência para o IBAN <code>AO06.0006.0000.7839.6727.3011.1</code>. O resto paga-se no salão.</li>
+        <li>Comprovativo em <b>24 horas</b>, senão a vaga é libertada.</li>
+        <li><b>Faltas:</b> a justificação é tratada presencialmente no salão. Com justificação válida, a equipa procura uma solução. Sem justificação válida, o sinal não é devolvido e a cliente faz uma nova marcação.</li>
+      </ul>
+    </section>
+
+    <section id="presenca">
+      <h2><small>Parte 2</small>Presença digital</h2>
+      <p>Todos os canais levam ao mesmo sítio: o WhatsApp 955 para marcar.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Canal</th><th>O que tem</th></tr></thead>
+        <tbody>
+          <tr><td>Site</td><td>marinasc.marinasc-chatbot.workers.dev. Serviços e preços, galeria de vídeos, horário, mapa, política de privacidade.</td></tr>
+          <tr><td>Google (Maps e Pesquisa)</td><td>Perfil "MARINASC" com horário, descrição, categorias e link do menu. Pedir avaliações às clientes.</td></tr>
+          <tr><td>Instagram</td><td>@marynasc_salao_de_beleza_. Bio com serviços, morada e marcações 24 h pelo WhatsApp.</td></tr>
+          <tr><td>TikTok</td><td>@salo.marinasc (a conta antiga deixou de ser usada).</td></tr>
+          <tr><td>Facebook</td><td>Página MariNasc, ligada ao Instagram.</td></tr>
+        </tbody>
+      </table></div>
+      <p>As bios para copiar e os cuidados com cada rede estão em <code>docs/REDES-SOCIAIS.md</code>.</p>
+    </section>
+
+    <section id="chatbot">
+      <h2><small>Parte 3</small>Criar o chatbot, passo a passo</h2>
+      <h3>Como uma mensagem percorre o sistema</h3>
+      <div class="fluxo"><div class="fluxo-grid">
+        <div><b>1 · Cliente</b>Escreve ou envia áudio para o 955</div>
+        <div><b>2 · Meta</b>A WhatsApp Cloud API entrega a mensagem ao endereço do bot</div>
+        <div><b>3 · Cloudflare</b>Confirma a assinatura da Meta e passa a mensagem ao bot</div>
+        <div><b>4 · Bot</b>Menu, FAQ, agenda ou IA (Groq) decidem a resposta</div>
+        <div><b>5 · Respostas</b>A cliente recebe a resposta; a equipa (946) recebe os avisos</div>
+      </div></div>
+      <ol class="passos">
+        <li><div><b>Conta Meta Business e app</b>No Meta for Developers, criar uma app do tipo Business ligada ao portefólio da empresa e adicionar o produto WhatsApp.</div></li>
+        <li><div><b>Número próprio para o bot</b>Registar o 955 na WhatsApp Cloud API. Um número que está na API deixa de funcionar na app do WhatsApp, por isso a equipa continua no 946.</div></li>
+        <li><div><b>Chaves de acesso</b>Token permanente (utilizador de sistema), segredo da app e um token de verificação inventado. São palavras-passe: nunca se mostram, nunca vão para o código nem para o git. Na Cloudflare guardam-se com <code>npx wrangler secret put NOME</code>.</div></li>
+        <li><div><b>Política de privacidade</b>A Meta exige um link público. Está em <code>site/privacidade.html</code>.</div></li>
+        <li><div><b>O código do bot</b>Node.js. Cada parte tem a sua tarefa: receber e enviar mensagens, menu e FAQ, IA, agenda, marcações, comandos da equipa e estatísticas. As respostas e os preços estão em ficheiros simples (<code>src/data/</code>), que a equipa pode editar.</div></li>
+        <li><div><b>Inteligência artificial gratuita</b>Groq, com o modelo <code>openai/gpt-oss-120b</code> para conversar e <code>whisper-large-v3-turbo</code> para os áudios. A IA só usa a informação do salão e nunca inventa preços. Se o Groq falhar ou chegar ao limite, o bot responde com o FAQ.</div></li>
+        <li><div><b>Alojamento sempre ligado</b>Cloudflare Workers, no plano gratuito. Um único "Durable Object" trata as mensagens por ordem e guarda as marcações e conversas. O site é servido pelo mesmo Worker. Publicar: <code>npm run deploy</code>.</div></li>
+        <li><div><b>Ligar a Meta ao bot (webhook)</b>Na app da Meta, apontar o webhook para <code>/webhook</code> do site, com o token de verificação, e subscrever as mensagens. Conferir em <code>/health</code>, que mostra a última mensagem recebida.</div></li>
+        <li><div><b>Testar sem WhatsApp</b><code>npm run simular</code> corre uma conversa completa no terminal: preços, marcação, horas ocupadas, sinal, comprovativo, comandos da equipa.</div></li>
+        <li><div><b>Aprender com quem já faz bem</b>Estudámos chatbot.com, Invent, Chattigo e Chatbot App. Aplicámos: botões em vez de "digite 1", só oferecer horas livres, sugerir alternativas quando a hora está ocupada, passar para uma pessoa quando é preciso, memória da conversa.</div></li>
+        <li><div><b>Instagram (preparado)</b>O mesmo bot responde às mensagens directas do Instagram quando a app da Meta tiver o token e o webhook do Instagram (<code>docs/INSTAGRAM.md</code>).</div></li>
+      </ol>
+      <div class="nota"><b>Custo mensal actual:</b> 0 Kz em alojamento e IA (planos gratuitos da Cloudflare e do Groq). As conversas de serviço na WhatsApp Cloud API, em que é a cliente que escreve primeiro, não pagam.</div>
+    </section>
+
+    <section id="marcacoes">
+      <h2><small>Parte 4</small>Como funciona uma marcação</h2>
+      <ol class="passos">
+        <li><div><b>Serviço, dia e hora</b>A cliente escreve "marcar" (ou "quero cordoletes sábado às 10h"). O bot mostra os dias com vaga e só as horas livres. Se a hora pedida estiver ocupada, sugere as 3 livres mais perto.</div></li>
+        <li><div><b>Pedido registado com código</b>Ex.: <code>#K7Q2</code>, com o preço e o sinal de 30% (cordoletes com cachos, 17.500 Kz → sinal 5.300 Kz), o IBAN e o prazo do comprovativo. A hora fica reservada. A equipa recebe o aviso.</div></li>
+        <li><div><b>Comprovativo</b>A cliente envia a foto ou o PDF ao bot. O bot reenvia-o ao 946 com o código.</div></li>
+        <li><div><b>Confirmação</b>A equipa vê o dinheiro na conta e escreve <code>/confirmar K7Q2</code>. A cliente recebe a confirmação com a morada.</div></li>
+        <li><div><b>Sem comprovativo em 24 h</b>O pedido expira e a hora volta a ficar livre. A cliente e a equipa são avisadas. Se o comprovativo chegar depois, a equipa ainda pode confirmar se a hora estiver livre.</div></li>
+        <li><div><b>Mudanças e faltas</b>A cliente pode escrever "remarcar" (o sinal passa para a nova marcação) ou "cancelar marcação". Se faltar, a equipa escreve <code>/faltou K7Q2</code> e a cliente recebe a regra das faltas.</div></li>
+      </ol>
+    </section>
+
+    <section id="equipa">
+      <h2><small>Parte 5</small>Rotina da equipa</h2>
+      <p>Os comandos escrevem-se do 946 para o 955, como uma mensagem normal.</p>
+      <div class="tabela"><table>
+        <thead><tr><th>Quando</th><th>O quê</th></tr></thead>
+        <tbody>
+          <tr><td>Todas as manhãs</td><td><code>/agenda</code>: vê o dia e abre a janela de 24 h da WhatsApp, para o bot conseguir enviar avisos ao 946.</td></tr>
+          <tr><td>Chega um comprovativo</td><td>Ver a transferência na conta, depois <code>/confirmar CÓDIGO</code>.</td></tr>
+          <tr><td>Marcação feita ao balcão ou por telefone</td><td><code>/ocupar sábado 10h cordoletes Maria</code>, para o bot não dar essa hora a outra cliente.</td></tr>
+          <tr><td>Folga, formação, feriado</td><td><code>/bloquear 25/12</code> ou <code>/bloquear sábado 14h-17h</code>.</td></tr>
+          <tr><td>Hora indisponível</td><td><code>/recusar CÓDIGO motivo</code> ou <code>/cancelar CÓDIGO motivo</code>.</td></tr>
+          <tr><td>Cliente não apareceu</td><td><code>/faltou CÓDIGO</code>.</td></tr>
+          <tr><td>Promoção</td><td><code>/promo 10% nas tranças até sexta</code> e, no fim, <code>/promo off</code>.</td></tr>
+          <tr><td>Uma vez por semana</td><td><code>/stats</code>: conversas, pedidos e serviços mais procurados.</td></tr>
+          <tr><td>Emergência</td><td><code>/pausa</code> (o bot só envia o contacto do 946) e <code>/retomar</code>.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Mudar preços, horário, durações ou o sinal: ver <code>docs/GUIA.md</code>. Depois de mudar, publicar com <code>npm run deploy</code>.</p>
+    </section>
+
+    <section id="marketing">
+      <h2><small>Parte 6</small>Marketing</h2>
+      <ul>
+        <li><b>Plano de publicações</b> (<code>docs/PUBLICACOES.md</code>): Novembro, segunda (trabalho feito), quarta (dica ou bastidores), sexta/sábado (oferta). Cada publicação termina com "Marque pelo WhatsApp 955 705 188".</li>
+        <li><b>Vídeo "Novidades"</b> (<code>marketing/novidades-marinasc.mp4</code>): 9 cenas em branco e dourado sobre filmagens reais do salão, da abertura à localização. Para mudar o texto: editar <code>marketing/cenas/cenas.html</code> e correr <code>bash marketing/fazer-video.sh</code>.</li>
+        <li><b>Tráfego pago</b> (<code>docs/TRAFEGO-PAGO.md</code>): anúncios no Instagram e Facebook que abrem a conversa no 955, para quem está a 5–8 km do Kilamba. Teste de 2 semanas. Continuar se cada cliente nova custar menos de 25% do valor da marcação; parar acima de 50%.</li>
+        <li><b>Google:</b> pedir avaliações às clientes satisfeitas e responder a todas.</li>
+      </ul>
+    </section>
+
+    <section id="pendentes">
+      <h2><small>Próximos passos</small>O que falta</h2>
+      <div class="tabela"><table>
+        <thead><tr><th>Tarefa</th><th>Quem</th></tr></thead>
+        <tbody>
+          <tr><td>Confirmar que o IBAN mostrado às clientes é exactamente o do banco</td><td>Gerência</td></tr>
+          <tr><td>Google: preços da barbearia e serviços de tranças, cabelo, spa e rosto; acompanhar a verificação do telefone</td><td>Equipa, com apoio</td></tr>
+          <tr><td>Instagram: ligações para o site e o WhatsApp 955 (só na app do telemóvel)</td><td>Equipa</td></tr>
+          <tr><td>Ligar o bot às mensagens do Instagram (token, segredo, webhook, revisão da Meta)</td><td>Com apoio técnico</td></tr>
+          <tr><td>Cartão com pagamentos internacionais e ligação do 955 à página do Facebook, para o teste de anúncios</td><td>Gerência</td></tr>
+          <tr><td>Rever as durações e o número de profissionais com a realidade do salão</td><td>Equipa</td></tr>
+          <tr><td>Cópia do código no GitHub (falta autenticar a conta)</td><td>Com apoio técnico</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <section id="ficheiros">
+      <h2><small>Referência</small>Onde está cada coisa</h2>
+      <div class="tabela"><table>
+        <thead><tr><th>Ficheiro</th><th>Conteúdo</th></tr></thead>
+        <tbody>
+          <tr><td><code>docs/COMO-USAR.md</code></td><td>Marcações, sinal, faltas e todos os comandos da equipa</td></tr>
+          <tr><td><code>docs/GUIA.md</code></td><td>Mudar preços, promoções, horário, agenda; o que fazer se o bot parar</td></tr>
+          <tr><td><code>docs/CLOUDFLARE.md</code></td><td>Alojamento, segredos e publicação</td></tr>
+          <tr><td><code>docs/LIGAR-WHATSAPP.md</code></td><td>Meta, token e webhook, passo a passo</td></tr>
+          <tr><td><code>docs/INSTAGRAM.md</code></td><td>Ligar o bot às mensagens do Instagram</td></tr>
+          <tr><td><code>docs/REDES-SOCIAIS.md</code></td><td>Bios, publicar, responder, Google</td></tr>
+          <tr><td><code>docs/PUBLICACOES.md</code></td><td>Plano de Novembro com legendas</td></tr>
+          <tr><td><code>docs/TRAFEGO-PAGO.md</code></td><td>Estudo de viabilidade dos anúncios</td></tr>
+          <tr><td><code>src/data/faq.json</code></td><td>Preços e respostas do bot</td></tr>
+          <tr><td><code>src/data/agenda.json</code></td><td>Durações, profissionais, sinal e prazo</td></tr>
+          <tr><td><code>src/data/horario.json</code></td><td>Horário e dias fechados</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <footer>MARINASC Salão de Beleza · Centralidade do Kilamba, C19, Apt. 41 · Marcações: WhatsApp 955 705 188</footer>
+  </main>
+</div>

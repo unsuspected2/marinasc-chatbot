@@ -11,12 +11,13 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
   promoções e comandos da equipa (`/stats`, `/promo`, `/pausa`, `/retomar`). Sem IA, responde com
   `src/data/faq.json`.
 - **Site** (`site/`): página estática com serviços e preços, galeria de trabalhos, horário, mapa e
-  botão "Marcar pelo WhatsApp" (946 397 096). Publicada no mesmo Worker do bot:
+  botão "Marcar pelo WhatsApp" (bot, 955 705 188). Publicada no mesmo Worker do bot:
   https://marinasc.marinasc-chatbot.workers.dev/
 
 **Como usar (marcações, comandos da equipa): [docs/COMO-USAR.md](docs/COMO-USAR.md).**
 **Redes sociais e Google (bios, publicações, avaliações): [docs/REDES-SOCIAIS.md](docs/REDES-SOCIAIS.md).**
 **Anúncios pagos (estudo de viabilidade e teste de 2 semanas): [docs/TRAFEGO-PAGO.md](docs/TRAFEGO-PAGO.md).**
+**Documento com todo o processo (empresa, presença digital, chatbot, onde estamos): [docs/processo-marinasc.html](docs/processo-marinasc.html).**
 **Uso diário (preços, promoções, horário, o que fazer se o bot parar): [docs/GUIA.md](docs/GUIA.md).**
 
 ## Estrutura
