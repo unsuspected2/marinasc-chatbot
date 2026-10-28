@@ -64,7 +64,7 @@ TikTok deve apontar para `https://www.tiktok.com/@salo.marinasc`.
 - Responda a todas as avaliações, boas e más, em 1–2 frases.
 - Mudou o horário (feriado, evento)? Actualize no Google ("Editar perfil → Horário → Horário especial"),
   em `src/data/horario.json` (o bot) e no site.
-- Serviços com preço: "Editar serviços" no perfil. A tabela completa está sempre no site (link do menu).
+- Serviços com preço: "Editar serviços" no perfil. Desde 28/10/2026 está lá a tabela completa (tranças, cabelo, unhas, spa, rosto, barbearia). Mudou um preço? Actualize-o também aí, além do bot e do site.
 
 ## 6. Ver os resultados (uma vez por mês)
 
