@@ -26,36 +26,40 @@ for i in 1 2 3 4 5 6 7 8 9; do
 done
 
 FPS=30
-# cena:duração(s):vídeo de fundo (vazio = imagem parada com zoom)
+# cena:duração(s):vídeo de fundo:estilo (nítido = filmagem visível com sombra em baixo;
+# desfocado = filmagem desfocada e escurecida, para o texto se ler bem)
 PLANO=(
-  "1:3.5:trabalho7.mp4"
-  "2:5.5:"
-  "3:6:"
-  "4:4.5:"
-  "5:4.5:"
-  "6:4.5:trabalho6.mp4"
-  "7:4.5:"
-  "8:5:"
-  "9:4.5:"
+  "1:4:trabalho7.mp4:nitido"
+  "2:5.5:trabalho1.mp4:desfocado"
+  "3:5.5:trabalho2.mp4:desfocado"
+  "4:4.5:trabalho4.mp4:desfocado"
+  "5:4.5:trabalho3.mp4:desfocado"
+  "6:4.5:trabalho6.mp4:nitido"
+  "7:4.5:trabalho5.mp4:desfocado"
+  "8:4.5:trabalho7.mp4:desfocado"
+  "9:4.5:trabalho2.mp4:desfocado"
 )
 
-# 2. Um clip por cena
+# Sombra em degradê para as cenas nítidas (transparente em cima, escura em baixo)
+ffmpeg -v error -y -f lavfi -i "color=black:s=1080x1920,format=rgba" -frames:v 1 \
+  -vf "geq=r=0:g=0:b=0:a='clip((Y-650)/1270*235,0,235)'" "$TMP/sombra.png"
+
+# 2. Um clip por cena: fundo em movimento + texto que entra a subir devagar
 for p in "${PLANO[@]}"; do
-  IFS=: read -r n dur bg <<<"$p"
-  frames=$(awk "BEGIN{print int($dur*$FPS)}")
-  if [[ -n "$bg" ]]; then
-    ffmpeg -v error -y -stream_loop -1 -i "$MEDIA/$bg" -i "$CENAS/c$n.png" -filter_complex \
-      "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=$FPS[bg];[bg][1:v]overlay=0:0,format=yuv420p" \
-      -t "$dur" -an -c:v libx264 -crf 20 -preset medium "$TMP/c$n.mp4"
+  IFS=: read -r n dur bg estilo <<<"$p"
+  base="scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1,fps=$FPS"
+  if [[ "$estilo" == nitido ]]; then
+    fundo="[0:v]$base,eq=saturation=0.85[f0];[f0][2:v]overlay=0:0[bg]"
   else
-    ffmpeg -v error -y -loop 1 -i "$CENAS/c$n.png" -filter_complex \
-      "[0:v]scale=1188:2112,zoompan=z='min(1+0.0006*on,1.05)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=$frames:s=1080x1920:fps=$FPS,setsar=1,format=yuv420p" \
-      -frames:v "$frames" -an -c:v libx264 -crf 20 -preset medium "$TMP/c$n.mp4"
+    fundo="[0:v]$base,gblur=sigma=28,eq=brightness=-0.32:saturation=0.5:contrast=0.9[bg]"
   fi
+  ffmpeg -v error -y -stream_loop -1 -i "$MEDIA/$bg" -loop 1 -i "$CENAS/c$n.png" -loop 1 -i "$TMP/sombra.png" -filter_complex \
+    "$fundo;[1:v]format=rgba,fade=t=in:st=0.15:d=0.8:alpha=1[txt];[bg][txt]overlay=x=0:y='if(lt(t,1),36*(1-t)*(1-t),0)':shortest=1,format=yuv420p" \
+    -t "$dur" -an -c:v libx264 -crf 19 -preset medium "$TMP/c$n.mp4"
 done
 
-# 3. Juntar com transições de 0,4 s
-T=0.4
+# 3. Juntar com transições suaves de 0,6 s
+T=0.6
 inputs=(); filter=""; offset=0; prev="0:v"
 for i in "${!PLANO[@]}"; do inputs+=(-i "$TMP/c$((i + 1)).mp4"); done
 for i in $(seq 1 $((${#PLANO[@]} - 1))); do
