@@ -84,6 +84,14 @@ function depositFor(servico) {
 
 const kz = n => `${String(n).replace(/\B(?=(\d{3})+$)/g, ".")} Kz`;
 
+const sinalPercent = () => agenda.sinal?.percentagem || 0;
+
+// "• Preço / • Sinal / • No salão": as contas feitas para a cliente
+function paymentLines(d) {
+  const desde = d.aPartirDe ? "desde " : "";
+  return `• Preço: ${desde}${kz(d.preco)}\n• Sinal (${d.percentagem}%): ${kz(d.valor)}\n• A pagar no salão: ${desde}${kz(d.preco - d.valor)}`;
+}
+
 // Texto com o valor e a conta, para a cliente
 function depositText(m) {
   const s = agenda.sinal;
@@ -344,7 +352,7 @@ function describe(m, { withClient = false } = {}) {
 }
 
 module.exports = {
-  areaFor, durationFor, openingHours, priceFor, depositFor, depositText, kz, POLICY, horaLabel, toMin, addDays, dayText,
+  areaFor, durationFor, openingHours, priceFor, depositFor, depositText, paymentLines, sinalPercent, kz, POLICY, horaLabel, toMin, addDays, dayText,
   all, find, ofDay, upcomingOf, blocks,
   whyNot, freeSlots, nextFreeDay, nearest,
   create, setState, block, unblock, describe,

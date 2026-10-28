@@ -54,6 +54,7 @@
       "profissionais": 2,
       "duracao_min": 180,
       "palavras": [
+        "tranca",
         "bobe",
         "cordolete",
         "twist",
@@ -75,7 +76,8 @@
         "fio a fio",
         "personalizacao",
         "simulacao"
-      ]
+      ],
+      "_ajuda": "Tranças: entre 1h30 e 3h, conforme a dificuldade. duracao_min é o tempo reservado na agenda (o máximo, 3h); um estilo mais rápido pode ter a sua duração em 'duracoes'."
     },
     "unhas": {
       "nome": "Unhas",
@@ -140,10 +142,6 @@
   },
   "duracoes": {
     "Viradas nagô": 120,
-    "Micro twists": 360,
-    "Natural twists": 300,
-    "Dreads": 240,
-    "French curls dreads": 300,
     "Aplicação de gelinho": 45,
     "Pé": 45,
     "Pedicure completo": 60,

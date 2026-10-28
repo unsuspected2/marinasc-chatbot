@@ -1,7 +1,7 @@
 // ============================================================
 // services/adminService.js
-// Comandos da equipa, só aceites dos números em ADMIN_NUMBERS
-// (por omissão o WhatsApp do salão, 946 397 096):
+// Comandos da equipa, só aceites dos números em data/equipa.json
+// (direcção e WhatsApp do salão, 946 397 096) e em ADMIN_NUMBERS:
 //   /stats            conversas e pré-marcações de hoje e da semana
 //   /marcacoes        as últimas 10 pré-marcações
 //   /agenda [dia]     marcações de um dia (hoje por omissão)
@@ -11,6 +11,7 @@
 //   /bloquear dia [10h-13h], /desbloquear dia
 //   /promo texto      define a promoção activa (/promo off desliga)
 //   /pausa, /retomar  desliga e volta a ligar o bot para os clientes
+//   /equipa           quem tem acesso (data/equipa.json)
 //   /admin            lista estes comandos
 // ============================================================
 
@@ -23,10 +24,20 @@ const agenda = require("./agendaService");
 const booking = require("./bookingService");
 const whatsappService = require("./whatsappService");
 
+const equipa = require("../data/equipa.json");
+
 const STATE_FILE = "estado.json";
 
+// Todos os números da equipa (equipa.json + ADMIN_NUMBERS), sem repetidos
+const ADMINS = [...new Set([...equipa.admins.map(a => a.numero.replace(/\D/g, "")), ...config.adminNumbers])];
+
 function isAdmin(from) {
-  return config.adminNumbers.includes(String(from).replace(/\D/g, ""));
+  return ADMINS.includes(String(from).replace(/\D/g, ""));
+}
+
+// "Eng. Josaid do Nascimento (Marketing (CEO))" → para cumprimentar e assinar avisos
+function adminName(from) {
+  return equipa.admins.find(a => a.numero === String(from).replace(/\D/g, ""))?.nome || null;
 }
 
 function isPaused() {
@@ -42,7 +53,7 @@ function formatSummary(title, s) {
   return `*${title}*\n   💬 ${s.conversas} conversa(s), ${s.mensagens} mensagem(ns)\n   📅 ${s.marcacoes} pré-marcação(ões)${top}`;
 }
 
-const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma (depois de o sinal entrar na conta) e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/faltou K7Q2: a cliente não apareceu; o sinal fica retido e ela é avisada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender";
+const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma (depois de o sinal entrar na conta) e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/faltou K7Q2: a cliente não apareceu; o sinal fica retido e ela é avisada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender\n/equipa: quem tem acesso a estes comandos";
 
 // -------------------------------------------------------
 // Devolve o texto da resposta, ou null se não for comando de admin
@@ -72,7 +83,10 @@ async function handleCommand(from, text) {
 
   switch (cmd.toLowerCase()) {
     case "/admin":
-      return HELP;
+      return adminName(from) ? `Olá, ${adminName(from)} 👋\n\n${HELP}` : HELP;
+
+    case "/equipa":
+      return `👥 *Números com acesso aos comandos e aos avisos*\n\n${equipa.admins.map(a => `• ${a.nome}, ${a.cargo}: ${a.numero.replace(/^244(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3")}`).join("\n")}\n\nPara mudar a lista: src/data/equipa.json.`;
 
     case "/stats": {
       const hoje = statsService.summary(statsService.lastDays(1));
@@ -207,4 +221,4 @@ async function handleCommand(from, text) {
   }
 }
 
-module.exports = { isAdmin, isPaused, handleCommand };
+module.exports = { isAdmin, adminName, isPaused, handleCommand, ADMINS };

@@ -300,7 +300,8 @@ async function handleInteractive(to, name, id, lang, title) {
     return true;
   }
   if ((id || "").startsWith("book_")) {
-    if (!bookingService.isActive(to)) return startBooking(to, "", name).then(() => true);
+    // "Marcar" debaixo de um preço: começa já com esse serviço
+    if (!bookingService.isActive(to)) return startBooking(to, bookingService.serviceFromId(id) || "", name).then(() => true);
     await continueBooking(to, title, name, id);
     return true;
   }
@@ -361,7 +362,7 @@ async function sendBookingStep(to, result, name) {
     const rows = list?.sections.flatMap(sec => sec.rows) || [];
     if (rows.length) {
       await whatsappService.sendList(to, { body: text, button: list.button }, list.sections,
-        `${text}\n\nHoras livres: ${rows.map(r => r.title).join(", ")}`);
+        `${text}\n\n${list.button === "Ver horas livres" ? "Horas livres" : "Opções"}: ${rows.map(r => r.description ? `${r.title} (${r.description})` : r.title).join(", ")}`);
     } else if (buttons?.length) {
       await whatsappService.sendButtons(to, text, buttons);
     } else {
@@ -393,12 +394,12 @@ async function sendBookingStep(to, result, name) {
 }
 
 // -------------------------------------------------------
-// Avisa a equipa (946) pelo bot. A Meta só entrega se a equipa tiver
+// Avisa a equipa (equipa.json: direcção e 946) pelo bot. A Meta só entrega a quem tiver
 // escrito ao bot nas últimas 24 h; senão o pedido continua na agenda
 // (/agenda) e no link "Enviar à equipa" do cliente.
 // -------------------------------------------------------
 async function notifyTeam(text) {
-  for (const admin of config.adminNumbers) {
+  for (const admin of adminService.ADMINS) {
     try {
       await whatsappService.sendTextMessage(admin, text);
     } catch {
@@ -504,7 +505,7 @@ async function handleReceipt(to, type, mediaId) {
   const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}${atrasado ? " ⌛ chegou depois do prazo" : ""}\n${agendaService.describe(c, { withClient: true })}\n\nVerifique a transferência na conta e depois: /confirmar ${c.codigo}`
     + (atrasado ? " (o bot avisa se a hora já tiver sido ocupada)" : "");
   let enviado = false;
-  for (const admin of config.adminNumbers) {
+  for (const admin of adminService.ADMINS) {
     try {
       await whatsappService.forwardMedia(admin, mediaId, type, legenda);
       enviado = true;
@@ -580,7 +581,7 @@ async function handleIncomingMessage(req, res) {
     // 3. Marca como lida e mostra "a escrever..." enquanto o bot pensa
     await whatsappService.markAsRead(messageId, from);
 
-    // 4. Comandos da equipa (só do 946 397 096 / ADMIN_NUMBERS)
+    // 4. Comandos da equipa (só dos números de data/equipa.json / ADMIN_NUMBERS)
     if (type === "text" && text.startsWith("/")) {
       const adminReply = await adminService.handleCommand(from, text);
       if (adminReply) {
@@ -724,11 +725,22 @@ async function answerFreeText(from, name, text, lang, normalizedText) {
     return;
   }
 
-  // 2. Conversa livre: a IA responde com o contexto da conversa
+  // 2. Preço ou sinal de um serviço da tabela: as contas feitas, sem IA
+  const asksPrice = containsTrigger(normalizedText, [...KEYWORD_FLOWS.priceTriggers, "sinal", "pagar", "pago", "transferir"]);
+  const price = asksPrice && lang !== "en" ? bookingService.priceAnswer(text) : null;
+  if (price?.texto) {
+    await whatsappService.sendButtons(from, price.texto, [{ id: price.id, title: "📅 Marcar" }, NEXT_STEP_BUTTONS.pt[1]]);
+    aiService.addToHistory(from, "user", text);
+    aiService.addToHistory(from, "assistant", price.texto);
+    return;
+  }
+
+  // 3. Conversa livre: a IA responde com o contexto da conversa
   const promo = promoService.promoText();
+  const contas = price?.opcoes ? `\n\nCONTAS DO SINAL (usa estes valores, não calcules):\n${bookingService.priceContext(price.opcoes)}` : "";
   const aiResponse = await aiService.getAIResponse(from, text, {
     name: firstName(name),
-    extra: promo ? `PROMOÇÕES ACTIVAS (podes mencioná-las quando fizer sentido):\n${promo}` : "PROMOÇÕES ACTIVAS: nenhuma de momento. Não prometas descontos.",
+    extra: (promo ? `PROMOÇÕES ACTIVAS (podes mencioná-las quando fizer sentido):\n${promo}` : "PROMOÇÕES ACTIVAS: nenhuma de momento. Não prometas descontos.") + contas,
   });
   if (aiResponse) {
     logger.info("Resposta da IA", { from });

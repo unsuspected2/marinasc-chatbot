@@ -66,7 +66,7 @@ Ficheiro: **`src/data/agenda.json`**. É este que decide quando uma hora está c
   - `duracao_min`: duração normal de um serviço dessa área, em minutos;
   - `palavras`: palavras que põem um serviço nessa área (sem acentos);
   - `horario` (só a barbearia): horário próprio, em vez do do salão.
-- `duracoes` → duração de serviços que fogem à regra da área (ex.: `"Micro twists": 360`).
+- `duracoes` → duração de serviços que fogem à regra da área (ex.: `"Viradas nagô": 120`). As tranças levam de 1h30 a 3h: a área reserva 3h e os estilos mais rápidos têm a sua duração aqui.
 - `intervalo_min` → de quanto em quanto tempo o bot oferece horas (30 = 9h, 9h30, 10h…).
 - `antecedencia_min` → com quanta antecedência se pode marcar para hoje (60 = só daqui a 1 hora).
 - `sinal` → `percentagem` (30), `iban` da empresa e `prazo_horas` (24) para o comprovativo. O valor do sinal sai do preço da tabela

@@ -23,8 +23,10 @@ const flows = store.persistentMap("marcacoes-a-meio.json", FLOW_TTL_MS);
 // Catálogo de serviços: as linhas "• Nome: preço" do FAQ e mais
 // os serviços "sob consulta"
 // -------------------------------------------------------
-const EXTRA_SERVICES = ["Box braids", "Knotless", "Manicure", "Pedicure", "Lavagem", "Escova",
-  "Tratamento", "Hidratação", "Corte", "Alisamento", "Coloração", "Penteado", "Peruca", "Unhas de gel"];
+// Sem preço na tabela: a equipa diz o valor
+const SOB_CONSULTA = ["Box braids", "Knotless", "Penteado", "Peruca"];
+const EXTRA_SERVICES = [...SOB_CONSULTA, "Manicure", "Pedicure", "Lavagem", "Escova",
+  "Tratamento", "Hidratação", "Corte", "Alisamento", "Coloração", "Unhas de gel"];
 
 const SERVICES = [...new Set([
   ...Object.entries(faq)
@@ -46,6 +48,82 @@ function findService(text) {
   return SERVICES
     .filter(s => n.includes(` ${normalize(s)} `) || n.includes(` ${normalize(s).replace(/s$/, "")} `))
     .sort((a, b) => b.length - a.length)[0] || null;
+}
+
+// -------------------------------------------------------
+// Escolha do serviço com preço: a cliente toca num serviço da tabela
+// e o bot já sabe o preço e o sinal (sem "a equipa diz-lhe o valor")
+// -------------------------------------------------------
+const PRICED = SERVICES.filter(s => agenda.priceFor(s));
+
+// Grupos da tabela (menu_trancas, menu_unhas…), pela ordem do FAQ
+const CATEGORIES = Object.entries(faq)
+  .filter(([k, v]) => k.startsWith("menu_") && /^•/m.test(v))
+  .map(([k, v]) => ({
+    id: k.slice(5),
+    title: (/\*([^*]+)\*/.exec(v)?.[1] || k.slice(5)).trim(),
+    servicos: v.split("\n").map(l => /^•\s*([^:]+):/.exec(l.trim())?.[1].trim()).filter(s => s && PRICED.includes(s)),
+  }));
+
+const STOP = new Set(["com", "sem", "para", "uma", "uns", "das", "dos", "que", "por", "mais", "quero", "queria", "fazer", "marcar", "marcacao", "favor"]);
+
+// Serviços com preço que se parecem com o texto ("corte", "unhas de gel", "tranças"):
+// { opcoes, porArea } (porArea: nenhum nome bate, só a área)
+function candidates(text) {
+  const words = normalize(text).split(" ").filter(w => w.length >= 3 && !STOP.has(w)).map(w => w.replace(/s$/, ""));
+  const scored = PRICED
+    .map(s => ({ s, score: words.filter(w => ` ${normalize(s)}`.includes(` ${w}`)).length }))
+    .filter(c => c.score);
+  const top = Math.max(0, ...scored.map(c => c.score));
+  const found = scored.filter(c => c.score === top).map(c => c.s);
+  if (found.length) return { opcoes: found };
+  // Só a área ("tranças", "spa"): o grupo da tabela com o mesmo nome
+  const area = agenda.areaFor(text);
+  return { opcoes: CATEGORIES.find(c => c.id === area)?.servicos || [], porArea: true };
+}
+
+function serviceRow(s) {
+  const d = agenda.depositFor(s);
+  return {
+    id: `book_serv_${PRICED.indexOf(s)}`,
+    title: s,
+    description: `${d.aPartirDe ? "desde " : ""}${agenda.kz(d.preco)} · sinal ${agenda.kz(d.valor)}`,
+  };
+}
+
+// Lista de até 10 linhas; com mais serviços, a última é "Ver mais"
+function servicePicker(opcoes, offset = 0, intro = "Qual destes serviços?") {
+  const page = opcoes.length - offset > 10 ? opcoes.slice(offset, offset + 9) : opcoes.slice(offset, offset + 10);
+  const rows = page.map(serviceRow);
+  if (offset + page.length < opcoes.length) rows.push({ id: `book_mais_${offset + page.length}`, title: "Ver mais ➡️", description: `Mais ${opcoes.length - offset - page.length} serviços` });
+  return {
+    text: `${intro} Toque em *Escolher serviço*: em cada um vê o preço e o sinal de ${agenda.sinalPercent()}% a transferir.`,
+    list: { button: "Escolher serviço", sections: [{ title: "Serviços", rows }] },
+  };
+}
+
+function categoryPicker(intro = "📅 Vamos preparar a sua marcação! Que serviço deseja?") {
+  return {
+    text: `${intro} Escolha a área na lista, ou escreva o nome do serviço (ex.: cordoletes com cachos, gel na unha).`,
+    list: {
+      button: "Ver áreas",
+      sections: [{ title: "Áreas", rows: CATEGORIES.map(c => ({ id: `book_cat_${c.id}`, title: c.title, description: `${c.servicos.length} serviços com preço` })) }],
+    },
+  };
+}
+
+// O que a cliente escreveu → serviço escolhido, ou lista para escolher
+// { servico } | { opcoes } | {}
+function resolveService(text) {
+  const found = findService(text);
+  const { opcoes, porArea } = candidates(text);
+  // "natural twists" bate em "Twists", mas há nomes que batem melhor
+  if (found && agenda.priceFor(found) && opcoes.includes(found)) return { servico: found };
+  // Serviço sob consulta (box braids, knotless…): a equipa diz o valor
+  if (SOB_CONSULTA.includes(found) && porArea) return { servico: found };
+  if (opcoes.length === 1) return { servico: opcoes[0] };
+  if (opcoes.length) return { opcoes };
+  return found ? { servico: found } : {};
 }
 
 // -------------------------------------------------------
@@ -159,7 +237,7 @@ function nextStep(f) {
 function prompt(f, profileName) {
   switch (nextStep(f)) {
     case "servico":
-      return { text: "📅 Vamos preparar a sua marcação! Que serviço deseja? (ex.: cordoletes com cachos, unhas de gel, sobrancelhas)" };
+      return f.opcoes ? servicePicker(f.opcoes, 0, "📅 Vamos preparar a sua marcação!") : categoryPicker();
     case "dia": {
       // Os 3 próximos dias com vaga para este serviço
       const dias = [];
@@ -197,7 +275,8 @@ function capitalize(s) {
 // ("quero marcar cordoletes para sábado às 10h")
 // -------------------------------------------------------
 function start(from, text = "") {
-  const f = { servico: findService(text), dia: parseDay(text), hora: null, nome: null, updatedAt: Date.now() };
+  const { servico = null, opcoes } = resolveService(text);
+  const f = { servico, ...(opcoes && { opcoes }), dia: parseDay(text), hora: null, nome: null, updatedAt: Date.now() };
   const hora = parseTime(text);
   // Só fica com a hora se estiver livre; senão o passo "hora" mostra as livres
   if (f.servico && f.dia && hora?.minutos !== undefined && !agenda.whyNot(f.dia.data, hora.minutos, f.servico)) f.hora = hora;
@@ -304,11 +383,35 @@ function answer(from, text, { interactiveId, profileName } = {}) {
   const value = (text || "").trim();
 
   switch (nextStep(f)) {
-    case "servico":
-      f.servico = findService(value) || capitalize(value.slice(0, 60));
+    case "servico": {
+      const escolha = /^book_serv_(\d+)$/.exec(interactiveId || "");
+      const mais = /^book_mais_(\d+)$/.exec(interactiveId || "");
+      const cat = CATEGORIES.find(c => interactiveId === `book_cat_${c.id}`);
+      if (mais && f.opcoes) return { reply: servicePicker(f.opcoes, +mais[1]) };
+      if (cat) {
+        f.opcoes = cat.servicos;
+        flows.save();
+        return { reply: servicePicker(f.opcoes, 0, `${cat.title}:`) };
+      }
+      const r = escolha ? { servico: PRICED[+escolha[1]] } : resolveService(value);
+      if (!r.servico && r.opcoes) {
+        f.opcoes = r.opcoes;
+        flows.save();
+        return { reply: servicePicker(f.opcoes) };
+      }
+      if (!r.servico && !f.tentouServico) {
+        // Primeira vez sem perceber: mostra as áreas; à segunda aceita o que escreveu
+        f.tentouServico = true;
+        flows.save();
+        return { reply: categoryPicker("Não encontrei esse serviço na tabela 🙈") };
+      }
+      f.servico = r.servico || capitalize(value.slice(0, 60));
+      delete f.opcoes;
+      delete f.tentouServico;
       // "unhas de gel para sábado" → aproveita o dia também
       if (!f.dia) f.dia = parseDay(value);
       break;
+    }
 
     case "dia": {
       const dia = interactiveId === "book_dia_hoje" ? parseDay("hoje")
@@ -381,7 +484,7 @@ function answer(from, text, { interactiveId, profileName } = {}) {
   const mensagem = `Olá, sou ${f.nome}, quero marcar ${f.servico} para ${diaTexto}, ${f.hora.label}. (pedido #${marcacao.codigo})`;
   const url = `https://wa.me/${TEAM_NUMBER}?text=${encodeURIComponent(mensagem)}`;
   return { done: { resumo: `• Serviço: ${f.servico}\n• Dia: ${capitalize(f.dia.label)}\n• Hora: ${f.hora.label.replace(/^às /, "")} (${durationText(f.servico)})\n• Nome: ${f.nome}\n• Código: #${marcacao.codigo}`
-    + (marcacao.sinal ? `\n• Preço: ${marcacao.sinal.aPartirDe ? "a partir de " : ""}${agenda.kz(marcacao.sinal.preco)}` : ""), url, mensagem, marcacao, substituida } };
+    + (marcacao.sinal ? `\n${agenda.paymentLines(marcacao.sinal)}` : ""), url, mensagem, marcacao, substituida } };
 }
 
 // A hora pedida não dá: explica porquê e mostra as livres mais perto
@@ -400,4 +503,34 @@ function busyReply(f, minutos, why) {
   return { text: `${text} Horas livres mais perto:`, buttons };
 }
 
-module.exports = { start, startReschedule, answer, prompt, isActive, cancel, getFlow, findService, parseDay, parseTime };
+// "book_serv_12" (botão ou lista) → nome do serviço
+function serviceFromId(id) {
+  const m = /^book_serv_(\d+)$/.exec(id || "");
+  return m ? PRICED[+m[1]] || null : null;
+}
+
+// Preço, sinal e resto para uma pergunta ("quanto custa cordoletes?"):
+// { servico, texto } quando há um só serviço, { opcoes } quando há vários
+function priceAnswer(text) {
+  const { servico, opcoes } = resolveService(text);
+  const d = servico && agenda.depositFor(servico);
+  if (d) {
+    return {
+      servico,
+      id: `book_serv_${PRICED.indexOf(servico)}`,
+      texto: `💖 *${servico}*\n\n${agenda.paymentLines(d)}\n• Duração: ${agenda.areaFor(servico) === "trancas" && agenda.durationFor(servico) >= 180 ? "de 1h30 a 3h, conforme o estilo" : durationText(servico)}\n\n`
+        + "O sinal é por transferência e garante a vaga; o resto paga no salão. Quer marcar?",
+    };
+  }
+  return opcoes ? { opcoes } : null;
+}
+
+// Contas já feitas, para a IA não ter de calcular o sinal
+function priceContext(opcoes) {
+  return opcoes.slice(0, 20).map(s => {
+    const d = agenda.depositFor(s);
+    return `${s}: preço ${d.aPartirDe ? "desde " : ""}${agenda.kz(d.preco)}, sinal ${d.percentagem}% = ${agenda.kz(d.valor)}, no salão ${agenda.kz(d.preco - d.valor)}`;
+  }).join("\n");
+}
+
+module.exports = { start, startReschedule, answer, prompt, isActive, cancel, getFlow, findService, resolveService, serviceFromId, priceAnswer, priceContext, parseDay, parseTime };

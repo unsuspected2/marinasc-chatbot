@@ -25,7 +25,10 @@ Horário e localização · Marcar · Falar com a equipa. Os números ("1" a "9"
 
 ### Como funciona uma marcação
 
-1. **Serviço** → o bot pergunta (ou percebe da frase).
+1. **Serviço** → o bot percebe da frase ou mostra uma lista para escolher (primeiro a área, depois o
+   serviço). Cada linha da lista já tem o **preço e o sinal** (ex.: "17.500 Kz · sinal 5.300 Kz"), e o
+   resumo final mostra preço, sinal e o que fica a pagar no salão. Se a cliente escreve algo geral
+   ("tranças", "corte", "massagem"), o bot mostra só os serviços parecidos.
 2. **Dia** → mostra os próximos dias **com vaga** para esse serviço.
 3. **Hora** → mostra só as **horas livres** desse dia. Se a cliente escrever uma hora ocupada, o bot
    explica ("às 10h já não temos vaga") e sugere as 3 horas livres mais perto.
@@ -73,9 +76,21 @@ A barbearia tem horário próprio (seg–sex 8h30–19h30, sáb 8h30–17h30, do
 
 ---
 
-## 2. O que a equipa faz (a partir do 946 397 096)
+## 2. O que a equipa faz (a partir dos números da equipa)
 
-Os comandos escrevem-se como uma mensagem normal **para o 955 705 188**. Só funcionam do 946.
+Os comandos escrevem-se como uma mensagem normal **para o 955 705 188**. Só funcionam destes números,
+que também recebem os avisos de novas marcações e os comprovativos (lista em `src/data/equipa.json`;
+o comando `/equipa` mostra-a):
+
+| Número | Quem |
+|---|---|
+| 946 397 096 | WhatsApp do salão (equipa) |
+| 941 051 108 | Eng. Josaid do Nascimento, Marketing (CEO) |
+| 921 610 705 | Sra. Marisa, CEO, dona do MARINAS BOSS |
+| 931 376 018 | Josefa do Nascimento, gerente oficial |
+
+A WhatsApp só entrega os avisos a quem escreveu ao bot nas últimas 24 horas: cada um manda `/agenda`
+de manhã.
 
 ### No dia a dia
 

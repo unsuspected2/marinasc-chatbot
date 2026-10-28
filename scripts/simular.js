@@ -76,6 +76,15 @@ const EXEMPLOS = [
   "(comprovativo)",
   "(equipa) /confirmar {ultimo}",
   "quanto é o sinal? e se eu faltar?",
+  // Serviço genérico: a cliente escolhe na lista (preço e sinal em cada linha)
+  "quanto custa natural twists?",
+  "quero marcar tranças",
+  "[book_mais_9]",
+  "[book_serv_7]",
+  "cancelar",
+  "[btn_marcar]",
+  "[book_cat_barbearia]",
+  "cancelar",
   // Marcação já com serviço e dia na mensagem; cancelada a meio
   "quero marcar unhas de gel para sábado",
   "cancelar",
@@ -102,6 +111,7 @@ const EXEMPLOS = [
   "(equipa) /promo 10% de desconto nas tranças até sexta",
   "tem promoção?",
   "(equipa) /stats",
+  "(equipa) /equipa",
   "(equipa) /marcacoes",
   "(equipa) /pausa",
   "Olá",
