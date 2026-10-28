@@ -9,6 +9,7 @@
 // Formatos especiais (para simular o que não é texto):
 //   [menu_1] / [btn_marcar]   → tocar numa opção da lista ou num botão
 //   (foto)                    → enviar uma foto
+//   (comprovativo)            → enviar um PDF (ex.: comprovativo do sinal)
 //   (áudio) quero marcar…     → enviar um áudio; o texto faz de transcrição
 //   (equipa) /stats           → mensagem enviada do 946 397 096 (comandos de admin)
 //   (cliente2) …              → mensagem de outra cliente (para testar vagas ocupadas)
@@ -48,6 +49,7 @@ whatsappService.sendList = async (to, { body, button }, sections) =>
   show(to, `${body}\n[ ${button} ▾ ]\n${sections.map(s => `  ${s.title}:\n${s.rows.map(r => `   • ${r.title} (${r.id})`).join("\n")}`).join("\n")}`);
 whatsappService.sendLinkButton = async (to, text, label, url) =>
   show(to, `${text}\n[ ${label} ↗ ${decodeURIComponent(url)} ]`);
+whatsappService.forwardMedia = async (to, id, type, caption) => show(to, `[${type} reenviado] ${caption}`);
 whatsappService.markAsRead = async () => {};
 // Áudio simulado: o "ficheiro" é o próprio texto e a "transcrição" devolve-o
 whatsappService.downloadMedia = async id => ({ buffer: Buffer.from(id), mimeType: "audio/ogg" });
@@ -70,6 +72,10 @@ const EXEMPLOS = [
   "22h",
   "10h",
   "[book_nome_perfil]",
+  // Sinal: a cliente envia o comprovativo, a equipa confirma
+  "(comprovativo)",
+  "(equipa) /confirmar {ultimo}",
+  "quanto é o sinal? e se eu faltar?",
   // Marcação já com serviço e dia na mensagem; cancelada a meio
   "quero marcar unhas de gel para sábado",
   "cancelar",
@@ -84,6 +90,7 @@ const EXEMPLOS = [
   "(cliente3) Ana",
   "(equipa) /agenda sábado",
   "(equipa) /confirmar {ultimo}",
+  "(equipa) /faltou {ultimo}",
   "(equipa) /ocupar sábado 15h unhas de gel Joana",
   "(equipa) /bloquear domingo",
   "quero marcar sobrancelhas para domingo",
@@ -129,6 +136,7 @@ function message(text, id) {
     const reply = { id: m[1], title: m[1] };
     return { ...base, type: "interactive", interactive: m[1].startsWith("menu_") ? { type: "list_reply", list_reply: reply } : { type: "button_reply", button_reply: reply } };
   }
+  if (text === "(comprovativo)") return { ...base, type: "document", document: { id: "comprovativo-simulado" } };
   if (text === "(foto)") return { ...base, type: "image", image: { id: "foto-simulada" } };
   if ((m = /^\(áudio\)\s*(.+)$/.exec(text))) return { ...base, type: "audio", audio: { id: m[1] } };
   return { ...base, type: "text", text: { body: text } };

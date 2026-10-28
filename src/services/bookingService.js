@@ -4,7 +4,8 @@
 // livres na agenda (agendaService), guarda o pedido como pendente
 // (a vaga fica reservada) e gera o link wa.me da equipa.
 //
-// O bot nunca confirma a vaga: quem confirma é a equipa (/confirmar).
+// O bot nunca confirma a vaga: quem confirma é a equipa (/confirmar),
+// depois de receber o sinal (30%, agendaService.depositFor).
 // ============================================================
 
 const faq = require("../data/faq.json");
@@ -370,10 +371,17 @@ function answer(from, text, { interactiveId, profileName } = {}) {
   flows.delete(from);
   const marcacao = agenda.create({ cliente: from, nome: f.nome, servico: f.servico, dia: f.dia.data, inicio: f.hora.minutos, substitui: f.substitui });
   const substituida = f.substitui ? agenda.setState(f.substitui, "cancelada", { motivo: `remarcada para #${marcacao.codigo}` }) : null;
+  // O sinal já pago passa para a nova marcação
+  if (substituida?.sinalPago || substituida?.comprovativoEm) {
+    Object.assign(marcacao, agenda.setState(marcacao.codigo, "pendente", {
+      sinalPago: substituida.sinalPago, comprovativoEm: substituida.comprovativoEm, sinalDe: substituida.codigo,
+    }));
+  }
   const diaTexto = f.dia.label.replace(/^(hoje|amanhã), /, "$1, ");
   const mensagem = `Olá, sou ${f.nome}, quero marcar ${f.servico} para ${diaTexto}, ${f.hora.label}. (pedido #${marcacao.codigo})`;
   const url = `https://wa.me/${TEAM_NUMBER}?text=${encodeURIComponent(mensagem)}`;
-  return { done: { resumo: `• Serviço: ${f.servico}\n• Dia: ${capitalize(f.dia.label)}\n• Hora: ${f.hora.label.replace(/^às /, "")} (${durationText(f.servico)})\n• Nome: ${f.nome}\n• Código: #${marcacao.codigo}`, url, mensagem, marcacao, substituida } };
+  return { done: { resumo: `• Serviço: ${f.servico}\n• Dia: ${capitalize(f.dia.label)}\n• Hora: ${f.hora.label.replace(/^às /, "")} (${durationText(f.servico)})\n• Nome: ${f.nome}\n• Código: #${marcacao.codigo}`
+    + (marcacao.sinal ? `\n• Preço: ${marcacao.sinal.aPartirDe ? "a partir de " : ""}${agenda.kz(marcacao.sinal.preco)}` : ""), url, mensagem, marcacao, substituida } };
 }
 
 // A hora pedida não dá: explica porquê e mostra as livres mais perto

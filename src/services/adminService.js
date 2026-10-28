@@ -6,6 +6,7 @@
 //   /marcacoes        as últimas 10 pré-marcações
 //   /agenda [dia]     marcações de um dia (hoje por omissão)
 //   /confirmar, /recusar, /cancelar CÓDIGO   e avisa o cliente
+//   /faltou CÓDIGO    a cliente não apareceu (sinal retido) e avisa-a
 //   /ocupar dia hora serviço nome            marcação feita pela equipa
 //   /bloquear dia [10h-13h], /desbloquear dia
 //   /promo texto      define a promoção activa (/promo off desliga)
@@ -41,7 +42,7 @@ function formatSummary(title, s) {
   return `*${title}*\n   💬 ${s.conversas} conversa(s), ${s.mensagens} mensagem(ns)\n   📅 ${s.marcacoes} pré-marcação(ões)${top}`;
 }
 
-const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender";
+const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma (depois de o sinal entrar na conta) e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/faltou K7Q2: a cliente não apareceu; o sinal fica retido e ela é avisada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender";
 
 // -------------------------------------------------------
 // Devolve o texto da resposta, ou null se não for comando de admin
@@ -93,7 +94,7 @@ async function handleCommand(from, text) {
       const linhas = lista.length ? lista.map(m => agenda.describe(m, { withClient: true })).join("\n") : "Sem marcações.";
       const bl = bloqueios.map(b => `⛔ Bloqueado ${b.inicio === undefined ? "o dia todo" : `${agenda.horaLabel(b.inicio)}–${agenda.horaLabel(b.fim)}`}${b.motivo ? ` (${b.motivo})` : ""}`).join("\n");
       const pend = lista.filter(m => (m.estado || "pendente") === "pendente").length;
-      return `${cab}\n\n${linhas}${bl ? `\n${bl}` : ""}${pend ? `\n\n⏳ ${pend} por confirmar: /confirmar CÓDIGO` : ""}`;
+      return `${cab}\n\n${linhas}${bl ? `\n${bl}` : ""}${pend ? `\n\n⏳ ${pend} por confirmar: veja o sinal na conta e /confirmar CÓDIGO` : ""}`;
     }
 
     case "/confirmar":
@@ -107,8 +108,8 @@ async function handleCommand(from, text) {
       if (!["pendente", "confirmada"].includes(estado)) return `A marcação #${m.codigo} já está ${estado}.`;
       if (cmd.toLowerCase() === "/confirmar") {
         if (estado === "confirmada") return `A marcação #${m.codigo} já estava confirmada.`;
-        const c = agenda.setState(m.codigo, "confirmada", { por: from });
-        const nota = await tellClient(c, `✅ *Marcação confirmada!*\n\n${c.servico}, ${agenda.dayText(c.dia)}, às ${agenda.horaLabel(c.inicio)} (#${c.codigo}).\n📍 Centralidade do Kilamba, Edifício C19, Apt. 41.\n\nSe precisar de mudar, escreva *remarcar*; para cancelar, *cancelar marcação*. Até lá! 💖`);
+        const c = agenda.setState(m.codigo, "confirmada", { por: from, ...(m.sinal && { sinalPago: true }) });
+        const nota = await tellClient(c, `✅ *Marcação confirmada!*\n\n${c.servico}, ${agenda.dayText(c.dia)}, às ${agenda.horaLabel(c.inicio)} (#${c.codigo}).${c.sinal ? `\n💳 Sinal de ${agenda.kz(c.sinal.valor)} recebido; o resto paga no salão.` : ""}\n📍 Centralidade do Kilamba, Edifício C19, Apt. 41.\n\nSe precisar de mudar, escreva *remarcar*; para cancelar, *cancelar marcação*. Até lá! 💖`);
         logger.info("Marcação confirmada pela equipa", { codigo: c.codigo });
         return `✅ #${c.codigo} confirmada.${nota}`;
       }
@@ -118,6 +119,18 @@ async function handleCommand(from, text) {
         + (motivo ? `\nMotivo: ${motivo}` : "") + "\n\nQuer escolher outro dia ou hora? Escreva *marcar*. 💖");
       logger.info(`Marcação ${novo} pela equipa`, { codigo: c.codigo });
       return `${novo === "recusada" ? "❌" : "🚫"} #${c.codigo} ${novo}; a vaga ficou livre.${nota}`;
+    }
+
+    case "/faltou": {
+      const m = agenda.find(rest[0]);
+      if (!m) return `Não encontrei a marcação ${rest[0] || ""}. Veja os códigos com /agenda ou /marcacoes.`;
+      if ((m.estado || "pendente") !== "confirmada") return `A marcação #${m.codigo} está ${m.estado || "pendente"}; só se marca falta numa confirmada.`;
+      const c = agenda.setState(m.codigo, "faltou", { por: from });
+      const sinal = c.sinalPago ? `o sinal${c.sinal ? ` de ${agenda.kz(c.sinal.valor)}` : ""} fica retido` : "o sinal não é devolvido";
+      const nota = await tellClient(c, `Sentimos a sua falta 😔 A sua marcação de ${c.servico}, ${agenda.dayText(c.dia)}, às ${agenda.horaLabel(c.inicio)} (#${c.codigo}) foi encerrada porque não compareceu.\n\n`
+        + `Se teve um imprevisto, passe pelo salão para apresentar a justificação: a equipa avalia consigo e procura uma solução. Sem justificação válida, ${sinal} e, para voltar, é preciso fazer uma nova marcação (escreva *marcar*). 💖`);
+      logger.info("Cliente faltou à marcação", { codigo: c.codigo });
+      return `⚠️ #${c.codigo} marcada como falta${c.sinalPago ? `; sinal${c.sinal ? ` de ${agenda.kz(c.sinal.valor)}` : ""} retido até a cliente justificar no salão` : ""}.${nota}\nSe a justificação for válida, combine com ela e registe a nova hora com /ocupar.`;
     }
 
     case "/ocupar": {
@@ -156,7 +169,7 @@ async function handleCommand(from, text) {
     case "/marcações": {
       const ultimas = agenda.all().filter(m => m.codigo).slice(-10).reverse();
       if (!ultimas.length) return "Ainda não há pedidos de marcação.";
-      return `📅 *Últimos pedidos*\n\n${ultimas.map(m => agenda.describe(m, { withClient: true })).join("\n")}\n\n⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada`;
+      return `📅 *Últimos pedidos*\n\n${ultimas.map(m => agenda.describe(m, { withClient: true })).join("\n")}\n\n⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou`;
     }
 
     case "/promo": {

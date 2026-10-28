@@ -30,9 +30,30 @@ Horário e localização · Marcar · Falar com a equipa. Os números ("1" a "9"
 3. **Hora** → mostra só as **horas livres** desse dia. Se a cliente escrever uma hora ocupada, o bot
    explica ("às 10h já não temos vaga") e sugere as 3 horas livres mais perto.
 4. **Nome** → botão com o nome do perfil, ou escreve outro.
-5. **Pedido registado** com um código (ex.: **#K7Q2**). A vaga fica **reservada** até a equipa responder.
-   A equipa recebe o aviso no 946 (ver "Avisos" abaixo).
-6. A equipa responde `/confirmar K7Q2` → a cliente recebe "✅ Marcação confirmada" com a morada.
+5. **Pedido registado** com um código (ex.: **#K7Q2**), o preço e o **sinal de 30%** (ex.: cordoletes
+   com cachos 17.500 Kz → sinal 5.300 Kz, arredondado aos 100 Kz) com o IBAN da empresa. A vaga fica
+   **reservada** até a equipa responder. A equipa recebe o aviso no 946 (ver "Avisos" abaixo).
+6. A cliente faz a transferência e **envia o comprovativo** (foto ou PDF) ao bot. O bot reenvia-o para
+   o 946 com o código da marcação, e em `/agenda` aparece "💳 comprovativo enviado".
+7. A equipa vê o dinheiro na conta e responde `/confirmar K7Q2` → a cliente recebe "✅ Marcação
+   confirmada · sinal recebido" com a morada.
+
+### Sinal e faltas (regras do salão)
+
+- **Toda a marcação pede um sinal de 30%** do valor do serviço, por transferência para o IBAN
+  **AO06.0006.0000.7839.6727.3011.1**. O resto paga-se no salão.
+- Serviços **sem preço na tabela** (sob consulta): o bot diz "30% do valor" e a equipa diz o valor à
+  cliente.
+- **Remarcar** (a cliente escreve *remarcar*): o sinal já pago passa para a nova marcação.
+- **Cancelar com aviso:** o bot diz à cliente que a equipa fala com ela sobre o sinal (a equipa decide).
+- **Falta sem aviso:** a equipa escreve `/faltou K7Q2`. A cliente recebe a mensagem: a justificação é
+  tratada **presencialmente no salão**; com uma justificação válida, a equipa procura uma solução
+  (ex.: nova hora com `/ocupar`); **sem justificação válida, o sinal não é devolvido** e ela tem de
+  fazer uma **nova marcação**.
+- Estas regras aparecem à cliente no fim de cada marcação e quando pergunta por "sinal", "reembolso",
+  "faltar", "IBAN" ou "comprovativo".
+- Mudar a percentagem ou o IBAN: `src/data/agenda.json` → `sinal`, e o texto em `src/data/faq.json`
+  (chaves `sinal`, `pagamento`, `menu_marcar`). Depois `npx wrangler deploy`.
 
 **Como o bot evita marcações sobrepostas:** cada serviço tem uma duração (ex.: cordoletes ~3h) e cada
 área tem um número de profissionais (ex.: tranças 2, unhas 1). Uma hora só aparece livre se, durante
@@ -53,9 +74,10 @@ Os comandos escrevem-se como uma mensagem normal **para o 955 705 188**. Só fun
 |---|---|
 | `/agenda` | marcações de hoje, por hora, com o código e o contacto de cada cliente |
 | `/agenda amanhã` · `/agenda sábado` · `/agenda 15/11` | outro dia |
-| `/confirmar K7Q2` | confirma o pedido; a cliente é avisada |
+| `/confirmar K7Q2` | confirma o pedido **depois de o sinal entrar na conta**; a cliente é avisada |
 | `/recusar K7Q2 já não temos essa hora` | recusa, liberta a vaga e avisa a cliente com o motivo |
 | `/cancelar K7Q2 profissional doente` | cancela uma marcação já confirmada e avisa a cliente |
+| `/faltou K7Q2` | a cliente não apareceu: a marcação fecha, o sinal fica retido e ela é avisada das regras |
 
 ### Marcações que não vieram pelo bot
 
@@ -81,7 +103,7 @@ Se já houver marcações no período bloqueado, o bot mostra-as para as cancela
 
 | Comando | Para quê |
 |---|---|
-| `/marcacoes` | os últimos 10 pedidos, com o estado (⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada) |
+| `/marcacoes` | os últimos 10 pedidos, com o estado (⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou; 💳 = sinal) |
 | `/stats` | conversas de hoje e da semana, pedidos, serviços mais pedidos, quantos estão por confirmar |
 | `/promo 10% nas tranças até sexta` · `/promo off` | liga ou desliga a promoção |
 | `/pausa` · `/retomar` | o bot deixa de atender (só envia o link do 946) e volta a atender |

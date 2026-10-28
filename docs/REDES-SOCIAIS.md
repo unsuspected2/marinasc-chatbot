@@ -72,3 +72,7 @@ TikTok deve apontar para `https://www.tiktok.com/@salo.marinasc`.
   guardados. Repetir o tipo de vídeo que funcionou.
 - Google: "Desempenho" no perfil → chamadas, pedidos de direcções, cliques no site.
 - Bot: `/stats` no WhatsApp → conversas e pré-marcações da semana.
+
+## 7. Anúncios pagos
+
+Antes de pagar anúncios, ver o estudo e o teste de 2 semanas em [TRAFEGO-PAGO.md](TRAFEGO-PAGO.md).

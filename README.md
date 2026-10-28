@@ -16,6 +16,7 @@ Atendimento automático no WhatsApp e site de uma página do **MARINASC Salão d
 
 **Como usar (marcações, comandos da equipa): [docs/COMO-USAR.md](docs/COMO-USAR.md).**
 **Redes sociais e Google (bios, publicações, avaliações): [docs/REDES-SOCIAIS.md](docs/REDES-SOCIAIS.md).**
+**Anúncios pagos (estudo de viabilidade e teste de 2 semanas): [docs/TRAFEGO-PAGO.md](docs/TRAFEGO-PAGO.md).**
 **Uso diário (preços, promoções, horário, o que fazer se o bot parar): [docs/GUIA.md](docs/GUIA.md).**
 
 ## Estrutura

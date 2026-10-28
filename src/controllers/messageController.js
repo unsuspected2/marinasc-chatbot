@@ -5,7 +5,7 @@
 // Pipeline de processamento:
 //  1. Parse do payload recebido e descarte de repetidos
 //  2. Marcar mensagem como lida + "a escrever..."
-//  3. Áudio → transcrição; foto/vídeo/documento → encaminha para a equipa
+//  3. Áudio → transcrição; comprovativo do sinal → equipa; foto/vídeo → equipa
 //  4. Comandos da equipa (/stats, /promo, /pausa…) e bot em pausa
 //  5. Pré-marcação (serviço → dia → hora → nome → link para a equipa)
 //  6. Botões e listas interactivas, números do menu (1 a 9), comandos
@@ -373,17 +373,23 @@ async function sendBookingStep(to, result, name) {
 
   const { resumo, url, marcacao, substituida } = result.done;
   const status = horario.estado();
+  const pago = marcacao.sinalPago || marcacao.comprovativoEm;
   const text = `✅ Pedido de marcação registado!\n\n${resumo}\n\n`
-    + "A vaga fica reservada para si enquanto a equipa confirma. Vai receber a confirmação aqui. "
-    + "Se quiser, toque em *Enviar à equipa* para falar também com o salão (946 397 096). 💖"
+    + (pago
+      ? `💳 O sinal da marcação anterior (#${substituida.codigo}) passa para esta. A equipa confirma a nova hora aqui.`
+      : `${agendaService.depositText(marcacao)}\n\nA vaga fica reservada para si e a equipa confirma aqui assim que o sinal entrar na conta.`)
     + (substituida ? `\n\nA marcação anterior (#${substituida.codigo}) foi cancelada.` : "")
-    + (status.aberto ? "" : `\n\n🕘 ${horario.estadoTexto()} A equipa confirma assim que abrirmos.`);
+    + (status.aberto ? "" : `\n\n🕘 ${horario.estadoTexto()} A equipa confirma assim que abrirmos.`)
+    + "\n\nDúvidas? Toque em *Enviar à equipa* (946 397 096). 💖";
   await whatsappService.sendLinkButton(to, text, "Enviar à equipa", url);
-  aiService.addToHistory(to, "assistant", text);
+  // As regras das faltas vão à parte (o botão só aceita 1024 caracteres)
+  await whatsappService.sendTextMessage(to, `ℹ️ ${agendaService.POLICY}`);
+  aiService.addToHistory(to, "assistant", `${text}\n\n${agendaService.POLICY}`);
   logger.info("📅 Pré-marcação registada", { from: to, codigo: marcacao.codigo, servico: marcacao.servico, dia: marcacao.dia });
   await notifyTeam(`📅 *${substituida ? "Remarcação" : "Novo pedido de marcação"}*\n\n${agendaService.describe(marcacao, { withClient: true })}`
     + (substituida ? `\n   (substitui #${substituida.codigo})` : "")
-    + `\n\nPara confirmar: /confirmar ${marcacao.codigo}\nPara recusar: /recusar ${marcacao.codigo} motivo`);
+    + (marcacao.sinal && !pago ? `\n   💳 Sinal pedido: ${agendaService.kz(marcacao.sinal.valor)}` : !marcacao.sinal ? "\n   💳 Preço sob consulta: diga à cliente o valor do sinal (30%)" : "")
+    + `\n\nQuando o sinal entrar na conta: /confirmar ${marcacao.codigo}\nPara recusar: /recusar ${marcacao.codigo} motivo`);
 }
 
 // -------------------------------------------------------
@@ -411,7 +417,9 @@ async function sendMyBookings(to, intent = "ver") {
     return;
   }
   const list = mine.map(m => agendaService.describe(m)).join("\n");
-  const legenda = "\n\n⏳ à espera da confirmação da equipa · ✅ confirmada";
+  const semSinal = mine.find(m => m.estado === "pendente" && !m.sinalPago && !m.comprovativoEm);
+  const legenda = "\n\n⏳ à espera da confirmação da equipa · ✅ confirmada"
+    + (semSinal ? `\n\nFalta o sinal de #${semSinal.codigo}.\n${agendaService.depositText(semSinal)}` : "");
   if (mine.length === 1) {
     const m = mine[0];
     const pergunta = intent === "cancelar" ? "Quer mesmo cancelar?" : intent === "remarcar" ? "Quer mudar para outro dia ou hora?" : "O que deseja fazer?";
@@ -444,7 +452,8 @@ async function handleBookingAction(to, name, id) {
   }
   if (action === "cancelar") {
     agendaService.setState(m.codigo, "cancelada", { motivo: "cancelada pelo cliente" });
-    await sendWithNextStep(to, `🚫 Marcação #${m.codigo} cancelada. Obrigada por avisar! Quando quiser, marcamos outra. 💖`, "pt");
+    const sinal = m.sinalPago || m.comprovativoEm ? " Sobre o sinal que já pagou, a equipa fala consigo." : "";
+    await sendWithNextStep(to, `🚫 Marcação #${m.codigo} cancelada. Obrigada por avisar!${sinal} Quando quiser, marcamos outra. 💖`, "pt");
     logger.info("Marcação cancelada pelo cliente", { from: to, codigo: m.codigo });
     await notifyTeam(`🚫 *Cliente cancelou*\n\n${agendaService.describe({ ...m, estado: "cancelada" }, { withClient: true })}\n\nA vaga ficou livre.`);
     return;
@@ -476,6 +485,39 @@ async function transcribeIncomingAudio(mediaId) {
     logger.error("Não foi possível descarregar o áudio", err);
     return null;
   }
+}
+
+// -------------------------------------------------------
+// Comprovativo do sinal: foto ou PDF de quem tem uma marcação à espera
+// do sinal. Fica registado na marcação e vai para a equipa verificar.
+// -------------------------------------------------------
+async function handleReceipt(to, type, mediaId) {
+  if (!["image", "document"].includes(type)) return false;
+  const m = agendaService.upcomingOf(to).find(x => x.estado === "pendente" && !x.sinalPago && !x.comprovativoEm);
+  if (!m) return false;
+  const c = agendaService.setState(m.codigo, "pendente", { comprovativoEm: new Date().toISOString() });
+  const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}\n${agendaService.describe(c, { withClient: true })}\n\nVerifique a transferência na conta e depois: /confirmar ${c.codigo}`;
+  let enviado = false;
+  for (const admin of config.adminNumbers) {
+    try {
+      await whatsappService.forwardMedia(admin, mediaId, type, legenda);
+      enviado = true;
+    } catch (err) {
+      logger.warn("Não foi possível reenviar o comprovativo à equipa", { admin, erro: err.message });
+    }
+  }
+  if (!enviado) await notifyTeam(legenda.replace("Comprovativo", "Chegou o comprovativo"));
+  const text = `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! A equipa verifica a transferência e confirma a sua marcação aqui.`;
+  if (enviado) {
+    await whatsappService.sendTextMessage(to, text);
+  } else {
+    const url = `${TEAM_URL}?text=${encodeURIComponent(`Olá! Envio o comprovativo do sinal da marcação #${c.codigo}.`)}`;
+    await whatsappService.sendLinkButton(to, `${text}\n\nPara ser mais rápido, envie também o comprovativo à equipa.`, "Enviar à equipa", url);
+  }
+  aiService.addToHistory(to, "user", "[enviou o comprovativo do sinal]");
+  aiService.addToHistory(to, "assistant", text);
+  logger.info("💳 Comprovativo do sinal recebido", { from: to, codigo: c.codigo, reenviado: enviado });
+  return true;
 }
 
 // -------------------------------------------------------
@@ -562,6 +604,7 @@ async function handleIncomingMessage(req, res) {
       }
       logger.info(`🎤 Áudio transcrito: "${text}"`, { from });
     } else if (["image", "video", "document"].includes(type)) {
+      if (await handleReceipt(from, type, parsed.mediaId)) return;
       await handleMedia(from, type, aiService.detectLanguage(text || "olá"));
       return;
     } else if (type === "location") {

@@ -8,6 +8,7 @@
 //  - sendButtons / sendList / sendLinkButton → mensagens interactivas
 //  - markAsRead           → marcar como lida + "a escrever..."
 //  - downloadMedia        → descarregar áudio/foto recebido
+//  - forwardMedia         → reenviar uma foto/PDF recebido (ex.: comprovativo)
 //  - parseIncomingMessage → extrai dados do payload do webhook
 // ============================================================
 
@@ -277,6 +278,33 @@ async function downloadMedia(mediaId) {
   return { buffer: Buffer.from(file.data), mimeType: info.mime_type };
 }
 
+// -------------------------------------------------------
+// Reenvia uma foto ou documento recebido (WhatsApp ou Instagram) para
+// um número do WhatsApp: descarrega, volta a carregar e envia com legenda
+// -------------------------------------------------------
+async function forwardMedia(to, mediaId, type, caption) {
+  const { buffer, mimeType } = await downloadMedia(mediaId);
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("file", new Blob([buffer], { type: mimeType }), type === "image" ? "comprovativo.jpg" : "comprovativo.pdf");
+  const res = await fetch(`${config.graphApiUrl}/${config.phoneNumberId}/media`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${config.whatsappToken}` },
+    body: form,
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) throw new Error(`Graph API respondeu ${res.status} ao carregar o ficheiro`);
+  const { id } = await res.json();
+  const kind = type === "image" ? "image" : "document";
+  await postWithRetry(`/${config.phoneNumberId}/messages`, {
+    messaging_product: "whatsapp",
+    to,
+    type: kind,
+    [kind]: { id, caption: cut(caption, 1024), ...(kind === "document" && { filename: "comprovativo.pdf" }) },
+  });
+  logger.outgoing(to, `[${kind}] ${caption}`);
+}
+
 module.exports = {
   sendTextMessage,
   sendMenuMessage,
@@ -285,5 +313,6 @@ module.exports = {
   sendLinkButton,
   markAsRead,
   downloadMedia,
+  forwardMedia,
   parseIncomingMessage,
 };

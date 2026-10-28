@@ -45,7 +45,7 @@ const conversationMemory = store.persistentMap("memoria.json", MEMORY_TTL_MS);
 // -------------------------------------------------------
 // Informação do salão: vem do faq.json para não haver dois sítios com preços
 const faq = require("../data/faq.json");
-const SALON_INFO = ["sobre", "menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_spa", "menu_barbearia", "menu_horario"]
+const SALON_INFO = ["sobre", "sinal", "menu_trancas", "menu_unhas", "menu_rosto", "menu_cabelo", "menu_spa", "menu_barbearia", "menu_horario"]
   .map(k => faq[k].replace(/\*/g, ""))
   .join("\n\n");
 
@@ -68,6 +68,7 @@ O QUE PODES DIZER
 MARCAÇÕES, RECLAMAÇÕES E FALAR COM UMA PESSOA
 - Nunca confirmes tu uma marcação nem digas que há vaga.
 - Quando a pessoa quiser marcar, diz-lhe para escrever *marcar*: o assistente pergunta o serviço, o dia, a hora e o nome e prepara o pedido para a equipa, que confirma a vaga.
+- Toda a marcação pede um sinal de 30% do valor por transferência (IBAN e regras de faltas em "sinal"). Se perguntarem por reembolso ou faltas, explica a regra com calma: a justificação é tratada presencialmente no salão.
 - Reclamações ou pedidos para falar com uma pessoa: mostra empatia numa frase e encaminha para a equipa no WhatsApp 946 397 096 (https://wa.me/244946397096).
 - Se não souberes a resposta, encaminha para esse WhatsApp.
 
@@ -78,7 +79,7 @@ const SYSTEM_PROMPT_EN = `You are the virtual assistant of MARINASC Beauty Salon
 Always reply in English, warm and short (max 4 sentences), WhatsApp style. Prices are in Angolan Kwanza (Kz).
 Only use the information below (it is in Portuguese; translate it). Never make up prices, promotions, availability or services.
 If a service is "sob consulta" (on request) or not listed, say the team will confirm the price.
-This number is only the automated assistant. To book, talk to the team or complain, always send them to the salon WhatsApp +244 946 397 096 (https://wa.me/244946397096). Never confirm a booking yourself.
+This number is only the automated assistant. To book, talk to the team or complain, always send them to the salon WhatsApp +244 946 397 096 (https://wa.me/244946397096). Never confirm a booking yourself. Every booking needs a 30% deposit by bank transfer (see "sinal"); missed appointments without a valid reason, presented in person at the salon, lose the deposit.
 
 SALON INFORMATION:
 ${SALON_INFO}`;

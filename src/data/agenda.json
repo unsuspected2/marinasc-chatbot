@@ -2,6 +2,11 @@
   "_ajuda": "Duração dos serviços (minutos) e quantas clientes cada área atende ao mesmo tempo. Uma área com 'horario' usa esse horário em vez do do salão. Ver docs/GUIA.md, secção Agenda.",
   "intervalo_min": 30,
   "antecedencia_min": 60,
+  "sinal": {
+    "_ajuda": "Sinal pedido em cada marcação (percentagem do preço da tabela, arredondado aos 100 Kz) e conta para a transferência. Ver docs/GUIA.md, secção Sinal.",
+    "percentagem": 30,
+    "iban": "AO06.0006.0000.7839.6727.3011.1"
+  },
   "areas": {
     "barbearia": {
       "nome": "Barbearia",

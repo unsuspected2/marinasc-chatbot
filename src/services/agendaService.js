@@ -8,11 +8,16 @@
 // ocupam a vaga, para duas clientes não ficarem com a mesma hora
 // enquanto a equipa não confirma.
 //
-// Estados: pendente → confirmada | recusada; cancelada (cliente ou equipa)
+// Estados: pendente → confirmada | recusada; cancelada (cliente ou equipa);
+// faltou (a cliente não apareceu: o sinal fica retido, ver docs/GUIA.md)
+//
+// Sinal: cada marcação pede 30% do preço da tabela (agenda.json → sinal),
+// por transferência. A equipa confirma depois de ver o dinheiro na conta.
 // ============================================================
 
 const crypto = require("crypto");
 const agenda = require("../data/agenda.json");
+const faq = require("../data/faq.json");
 const horario = require("../utils/horario");
 const store = require("../utils/store");
 
@@ -49,6 +54,48 @@ function durationFor(servico) {
   if (exact) return exact[1];
   return agenda.areas[areaFor(servico)]?.duracao_min || 60;
 }
+
+// -------------------------------------------------------
+// Preço da tabela (linhas "• Nome: 11.000 Kz" do FAQ) e sinal
+// -------------------------------------------------------
+const PRICES = Object.entries(faq)
+  .filter(([k]) => k.startsWith("menu_"))
+  .flatMap(([, v]) => v.split("\n"))
+  .map(l => /^•\s*([^:]+):(.*)$/.exec(l.trim()))
+  .filter(Boolean)
+  .map(([, nome, resto]) => {
+    const valores = (resto.match(/\d{1,3}(?:\.\d{3})+/g) || []).map(v => +v.replace(/\./g, ""));
+    return { nome: normalize(nome), preco: valores.length ? Math.min(...valores) : null, aPartirDe: valores.length > 1 || /a partir/i.test(resto) };
+  })
+  .filter(p => p.preco);
+
+function priceFor(servico) {
+  return PRICES.find(p => p.nome === normalize(servico || "")) || null;
+}
+
+// { percentagem, valor, preco, aPartirDe } ou null (preço sob consulta: a equipa diz o valor)
+function depositFor(servico) {
+  const pct = agenda.sinal?.percentagem;
+  const p = priceFor(servico);
+  if (!pct || !p) return null;
+  return { percentagem: pct, valor: Math.ceil((p.preco * pct) / 100 / 100) * 100, preco: p.preco, aPartirDe: p.aPartirDe };
+}
+
+const kz = n => `${String(n).replace(/\B(?=(\d{3})+$)/g, ".")} Kz`;
+
+// Texto com o valor e a conta, para a cliente
+function depositText(m) {
+  const s = agenda.sinal;
+  if (!s?.percentagem) return "";
+  const valor = m.sinal?.valor
+    ? `*${kz(m.sinal.valor)}* (${s.percentagem}% de ${m.sinal.aPartirDe ? "a partir de " : ""}${kz(m.sinal.preco)})`
+    : `${s.percentagem}% do valor do serviço (a equipa diz-lhe o valor exacto)`;
+  return `💳 *Sinal para garantir a vaga:* ${valor}\nTransferência para o IBAN:\n${s.iban}\nDepois envie aqui a foto ou o PDF do comprovativo. O resto paga no salão.`;
+}
+
+const POLICY = "Se não puder vir, avise com antecedência (escreva *remarcar* ou *cancelar marcação*). "
+  + "Se faltar sem avisar, a justificação é tratada presencialmente no salão: com uma justificação válida, a equipa procura uma solução consigo; "
+  + "sem justificação válida, o sinal não é devolvido e precisa de fazer uma nova marcação.";
 
 function capacity(area) {
   return agenda.areas[area]?.profissionais || 1;
@@ -197,6 +244,7 @@ function create({ cliente, nome, servico, dia, inicio, estado = "pendente", orig
     inicio,
     duracao: durationFor(servico),
     hora: `às ${horaLabel(inicio)}`,
+    ...(estado === "pendente" && depositFor(servico) && { sinal: depositFor(servico) }),
     ...(substitui && { substitui }),
   };
   list.push(marcacao);
@@ -240,16 +288,17 @@ function dayText(iso) {
   return `${prefix}${wd}, ${d}/${m}`;
 }
 
-const ESTADO_EMOJI = { pendente: "⏳", confirmada: "✅", recusada: "❌", cancelada: "🚫" };
+const ESTADO_EMOJI = { pendente: "⏳", confirmada: "✅", recusada: "❌", cancelada: "🚫", faltou: "⚠️" };
 
 function describe(m, { withClient = false } = {}) {
   const fim = horaLabel(m.inicio + m.duracao);
-  return `${ESTADO_EMOJI[m.estado] || "⏳"} *#${m.codigo}* ${m.servico}, ${dayText(m.dia)}, ${horaLabel(m.inicio)}–${fim}`
+  const pago = m.sinalPago ? " · 💳 sinal pago" : m.comprovativoEm ? " · 💳 comprovativo enviado" : "";
+  return `${ESTADO_EMOJI[m.estado] || "⏳"} *#${m.codigo}* ${m.servico}, ${dayText(m.dia)}, ${horaLabel(m.inicio)}–${fim}${pago}`
     + (withClient ? `\n   ${m.nome}${m.origem === "equipa" ? " (marcada pela equipa)" : m.cliente.startsWith("ig:") ? " · pelo Instagram" : ` · wa.me/${m.cliente}`}` : "");
 }
 
 module.exports = {
-  areaFor, durationFor, openingHours, horaLabel, toMin, addDays, dayText,
+  areaFor, durationFor, openingHours, priceFor, depositFor, depositText, kz, POLICY, horaLabel, toMin, addDays, dayText,
   all, find, ofDay, upcomingOf, blocks,
   whyNot, freeSlots, nextFreeDay, nearest,
   create, setState, block, unblock, describe,
