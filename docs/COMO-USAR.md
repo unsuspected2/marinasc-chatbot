@@ -93,6 +93,19 @@ o comando `/equipa` mostra-a):
 A WhatsApp só entrega os avisos a quem escreveu ao bot nas últimas 24 horas: cada um manda `/agenda`
 de manhã.
 
+**Estes números nunca são tratados como clientes.** Uma mensagem sem "/" (ex.: "comprovativo falso",
+"já entrou") é lida como uma mensagem da equipa:
+
+- **Comprovativo falso:** responda ao aviso do comprovativo com *falso* (ou escreva "falso" com o código,
+  ex.: "9HPW falso"). O bot pergunta: *Sim, é falso* / *Pedir outro* / *Não mexer*.
+  - *Sim, é falso* → o pedido fica recusado, a vaga fica livre e a cliente é avisada de que a
+    transferência não consta na conta. Se a cliente voltar a marcar, a equipa vê
+    "⚠️ esta cliente já enviou um comprovativo falso".
+  - *Pedir outro* → o pedido continua reservado e a cliente recebe o pedido de um novo comprovativo.
+  - Também há o comando `/falso 9HPW`.
+- **Sinal entrou:** responda com *entrou* → botão *Sim, confirmar* (o mesmo que `/confirmar`).
+- **Testar o bot como cliente** a partir de um destes números: `/cliente` (2 horas); `/sair` para voltar.
+
 ### No dia a dia
 
 | Comando | Para quê |

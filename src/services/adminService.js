@@ -11,7 +11,12 @@
 //   /bloquear dia [10h-13h], /desbloquear dia
 //   /promo texto      define a promoção activa (/promo off desliga)
 //   /pausa, /retomar  desliga e volta a ligar o bot para os clientes
+//   /falso CÓDIGO     o comprovativo é falso: recusa o pedido e avisa a cliente
+//   /cliente, /sair   testar o bot como cliente a partir de um número da equipa
 //   /equipa           quem tem acesso (data/equipa.json)
+//
+// Os números da equipa nunca são tratados como clientes: mensagens sem "/"
+// ("comprovativo falso", "já entrou") vão para handleAdminMessage.
 //   /admin            lista estes comandos
 // ============================================================
 
@@ -27,6 +32,21 @@ const whatsappService = require("./whatsappService");
 const equipa = require("../data/equipa.json");
 
 const STATE_FILE = "estado.json";
+
+// Avisos enviados à equipa: id da mensagem → código da marcação
+// (quando a equipa responde a um aviso, o bot sabe de que marcação fala)
+const notices = store.persistentMap("avisos-equipa.json", 7 * 24 * 60 * 60 * 1000);
+// Números da equipa a testar o bot como cliente (/cliente), por 2 h
+const clientMode = store.persistentMap("equipa-modo-cliente.json", 2 * 60 * 60 * 1000);
+
+function rememberNotice(sent, codigo) {
+  const id = sent?.messages?.[0]?.id;
+  if (id && codigo) notices.set(id, { codigo, updatedAt: Date.now() });
+}
+
+function isClientMode(from) {
+  return clientMode.has(String(from));
+}
 
 // Todos os números da equipa (equipa.json + ADMIN_NUMBERS), sem repetidos
 const ADMINS = [...new Set([...equipa.admins.map(a => a.numero.replace(/\D/g, "")), ...config.adminNumbers])];
@@ -53,7 +73,7 @@ function formatSummary(title, s) {
   return `*${title}*\n   💬 ${s.conversas} conversa(s), ${s.mensagens} mensagem(ns)\n   📅 ${s.marcacoes} pré-marcação(ões)${top}`;
 }
 
-const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma (depois de o sinal entrar na conta) e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/faltou K7Q2: a cliente não apareceu; o sinal fica retido e ela é avisada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender\n/equipa: quem tem acesso a estes comandos";
+const HELP = "🛠️ *Comandos da equipa*\n\n*Agenda*\n/agenda: marcações de hoje (/agenda amanhã, /agenda sábado, /agenda 15/11)\n/confirmar K7Q2: confirma (depois de o sinal entrar na conta) e avisa o cliente\n/recusar K7Q2 motivo: recusa, liberta a vaga e avisa o cliente\n/cancelar K7Q2 motivo: cancela uma marcação confirmada\n/faltou K7Q2: a cliente não apareceu; o sinal fica retido e ela é avisada\n/ocupar sábado 10h cordoletes Maria: regista uma marcação feita no 946 ou ao telefone\n/bloquear 25/12 ou /bloquear sábado 14h-17h: o bot não marca nesse período\n/desbloquear 25/12\n\n*Outros*\n/stats: conversas e pré-marcações\n/marcacoes: os últimos 10 pedidos\n/promo texto: define a promoção (ex.: /promo 10% nas tranças até sexta)\n/promo off: desliga as promoções\n/promo: mostra a promoção actual\n/pausa: o bot deixa de atender clientes\n/retomar: o bot volta a atender\n/equipa: quem tem acesso a estes comandos\n/cliente: testar o bot como cliente (2 h; /sair para voltar)\n\n*Comprovativos*\n/falso K7Q2: o comprovativo é falso; recusa o pedido, liberta a vaga e avisa a cliente\nTambém pode responder ao aviso do comprovativo com \"falso\" ou \"entrou\".";
 
 // -------------------------------------------------------
 // Devolve o texto da resposta, ou null se não for comando de admin
@@ -84,6 +104,17 @@ async function handleCommand(from, text) {
   switch (cmd.toLowerCase()) {
     case "/admin":
       return adminName(from) ? `Olá, ${adminName(from)} 👋\n\n${HELP}` : HELP;
+
+    case "/falso":
+      return markFake(from, rest[0]);
+
+    case "/cliente":
+      clientMode.set(String(from), { updatedAt: Date.now() });
+      return "🧪 Modo cliente durante 2 horas: o bot responde-lhe como a uma cliente (marcar, preços, comprovativo). Os comandos com / continuam a funcionar. Para voltar: /sair";
+
+    case "/sair":
+      clientMode.delete(String(from));
+      return "👥 De volta ao modo equipa.";
 
     case "/equipa":
       return `👥 *Números com acesso aos comandos e aos avisos*\n\n${equipa.admins.map(a => `• ${a.nome}, ${a.cargo}: ${a.numero.replace(/^244(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3")}`).join("\n")}\n\nPara mudar a lista: src/data/equipa.json.`;
@@ -221,4 +252,98 @@ async function handleCommand(from, text) {
   }
 }
 
-module.exports = { isAdmin, adminName, isPaused, handleCommand, ADMINS };
+// -------------------------------------------------------
+// Comprovativo falso: recusa o pedido, liberta a vaga e avisa a cliente
+// -------------------------------------------------------
+async function markFake(from, codigo) {
+  const m = agenda.find(codigo);
+  if (!m) return `Não encontrei a marcação ${codigo || ""}. Formato: /falso K7Q2`;
+  if (!["pendente", "expirada"].includes(m.estado || "pendente")) return `A marcação #${m.codigo} já está ${m.estado}.`;
+  const c = agenda.setState(m.codigo, "recusada", { por: from, motivo: "comprovativo inválido", comprovativoInvalido: true });
+  const nota = await tellClient(c, `😔 A equipa verificou o comprovativo da marcação #${c.codigo} (${c.servico}, ${agenda.dayText(c.dia)}, às ${agenda.horaLabel(c.inicio)}) e a transferência não consta na conta do salão.\n\n`
+    + "Por isso o pedido foi cancelado e a vaga ficou livre. Se fez mesmo a transferência, fale com a equipa no WhatsApp 946 397 096 com o comprovativo do banco.");
+  logger.warn("Comprovativo falso: pedido recusado", { codigo: c.codigo, por: from });
+  return `❌ #${c.codigo} recusada: comprovativo falso. A vaga ficou livre.${nota}`;
+}
+
+// Pedidos com comprovativo à espera de verificação
+function receiptsToCheck() {
+  return agenda.all().filter(m => m.comprovativoEm && !m.sinalPago && ["pendente", "expirada"].includes(m.estado || "pendente"));
+}
+
+const FAKE_WORDS = /\b(falso|falsa|fals[oa]s|invalid[oa]|fake|forjad[oa]|nao (entrou|caiu|consta)|nao recebemos|nao chegou|e mentira|nao e verdadeir[oa])\b/;
+const OK_WORDS = /\b(entrou|caiu|recebido|recebemos|confirmad[oa]|confirmar|valido|verdadeir[oa]|esta certo|ta certo)\b/;
+
+// -------------------------------------------------------
+// Mensagem de um número da equipa sem "/": nunca é tratada como de uma
+// cliente. Percebe "comprovativo falso" / "já entrou" (com o código, ou a
+// responder ao aviso, ou o único comprovativo por verificar) e pede
+// confirmação com um botão. Devolve { text, buttons? }.
+// -------------------------------------------------------
+async function handleAdminMessage(from, { type, text = "", interactiveId, replyTo }) {
+  // Botões dos avisos
+  const btn = /^adm_(falso|confirmar|reenviar|nao)_?(\w*)$/.exec(interactiveId || "");
+  if (btn) {
+    const [, accao, codigo] = btn;
+    if (accao === "nao") return { text: "Ok, não mexi em nada." };
+    if (accao === "falso") return { text: await markFake(from, codigo) };
+    if (accao === "confirmar") return { text: await handleCommand(from, `/confirmar ${codigo}`) };
+    if (accao === "reenviar") {
+      const m = agenda.find(codigo);
+      if (!m) return { text: `Não encontrei a marcação ${codigo}.` };
+      const c = agenda.setState(m.codigo, m.estado || "pendente", { comprovativoEm: null });
+      const nota = await tellClient(c, `A equipa não conseguiu validar o comprovativo da marcação #${c.codigo} 🙈 Envie aqui o comprovativo correcto da transferência.\n\n${agenda.depositText(c)}`);
+      return { text: `📨 Pedi à cliente outro comprovativo para #${c.codigo}.${nota}` };
+    }
+  }
+
+  if (type !== "text" && type !== "interactive") {
+    return { text: "Este número é da equipa, por isso não trato ficheiros enviados daqui como comprovativos de clientes. Para testar como cliente: /cliente" };
+  }
+
+  const n = text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const fake = FAKE_WORDS.test(n);
+  const ok = !fake && OK_WORDS.test(n);
+  if (fake || ok || /comprovativo|transferencia|sinal/.test(n)) {
+    const code = /#?\b([A-HJ-NP-Z2-9]{4})\b/.exec(text.toUpperCase())?.[1];
+    const porCodigo = code && agenda.find(code);
+    const porResposta = replyTo && notices.get(replyTo) && agenda.find(notices.get(replyTo).codigo);
+    const abertos = receiptsToCheck();
+    const m = porCodigo || porResposta || (abertos.length === 1 ? abertos[0] : null);
+    if (!m) {
+      if (!abertos.length) return { text: "Não há comprovativos à espera de verificação. Veja os pedidos com /agenda ou /marcacoes." };
+      return { text: `Há ${abertos.length} comprovativos por verificar. Diga qual, com o código (ex.: "${abertos[0].codigo} falso"), ou responda ao aviso do comprovativo:\n\n${abertos.map(x => describe(x)).join("\n")}` };
+    }
+    if (fake) {
+      return {
+        text: `❌ Comprovativo falso de #${m.codigo}?\n${describe(m)}\n\nSe confirmar, o pedido é recusado, a vaga fica livre e a cliente recebe o aviso.`,
+        buttons: [{ id: `adm_falso_${m.codigo}`, title: "Sim, é falso" }, { id: `adm_reenviar_${m.codigo}`, title: "Pedir outro" }, { id: "adm_nao", title: "Não mexer" }],
+      };
+    }
+    if (ok) {
+      return {
+        text: `✅ O sinal de #${m.codigo} entrou na conta?\n${describe(m)}\n\nSe confirmar, a marcação fica confirmada e a cliente recebe o aviso.`,
+        buttons: [{ id: `adm_confirmar_${m.codigo}`, title: "Sim, confirmar" }, { id: "adm_nao", title: "Não mexer" }],
+      };
+    }
+    return {
+      text: `💳 Comprovativo de #${m.codigo}:\n${describe(m)}\n\nO sinal entrou na conta?`,
+      buttons: [{ id: `adm_confirmar_${m.codigo}`, title: "Entrou, confirmar" }, { id: `adm_falso_${m.codigo}`, title: "É falso" }, { id: `adm_reenviar_${m.codigo}`, title: "Pedir outro" }],
+    };
+  }
+
+  // Qualquer outra mensagem: resumo para a equipa, nunca a conversa das clientes
+  const abertos = receiptsToCheck();
+  const nome = adminName(from);
+  return {
+    text: `👥 ${nome ? `Olá, ${nome}! ` : ""}Este número é da equipa, por isso o bot não lhe responde como a uma cliente.\n\n`
+      + (abertos.length ? `💳 Comprovativos por verificar:\n${abertos.map(x => describe(x)).join("\n")}\n\nResponda com o código e "entrou" ou "falso" (ex.: "${abertos[0].codigo} falso").\n\n` : "")
+      + "Comandos: /agenda, /marcacoes, /admin (todos). Para testar o bot como cliente: /cliente",
+  };
+}
+
+function describe(m) {
+  return agenda.describe(m, { withClient: true });
+}
+
+module.exports = { isAdmin, adminName, isPaused, handleCommand, handleAdminMessage, rememberNotice, isClientMode, ADMINS };

@@ -85,6 +85,15 @@ const EXEMPLOS = [
   "[btn_marcar]",
   "[book_cat_barbearia]",
   "cancelar",
+  // Erro de escrita, comprovativo falso e resposta da equipa (nunca tratada como cliente)
+  "(cliente4) Quero tranças cordeletes para amanhã",
+  "(cliente4) [book_serv_2]",
+  "(cliente4) 12h",
+  "(cliente4) Sou a Josefa",
+  "(cliente4) (comprovativo)",
+  "(equipa) Comprovativo falso",
+  "(equipa) [adm_falso_{ultimo}]",
+  "(equipa) olá",
   // Marcação já com serviço e dia na mensagem; cancelada a meio
   "quero marcar unhas de gel para sábado",
   "cancelar",

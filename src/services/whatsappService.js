@@ -164,6 +164,7 @@ function parseIncomingMessage(body) {
       type: message.type,
       text: "",
       timestamp: message.timestamp,
+      replyTo: message.context?.id, // mensagem do bot a que respondeu (deslizar para responder)
     };
 
     switch (message.type) {
@@ -296,13 +297,14 @@ async function forwardMedia(to, mediaId, type, caption) {
   if (!res.ok) throw new Error(`Graph API respondeu ${res.status} ao carregar o ficheiro`);
   const { id } = await res.json();
   const kind = type === "image" ? "image" : "document";
-  await postWithRetry(`/${config.phoneNumberId}/messages`, {
+  const sent = await postWithRetry(`/${config.phoneNumberId}/messages`, {
     messaging_product: "whatsapp",
     to,
     type: kind,
     [kind]: { id, caption: cut(caption, 1024), ...(kind === "document" && { filename: "comprovativo.pdf" }) },
   });
   logger.outgoing(to, `[${kind}] ${caption}`);
+  return sent.data;
 }
 
 module.exports = {

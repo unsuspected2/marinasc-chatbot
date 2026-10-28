@@ -67,12 +67,34 @@ const CATEGORIES = Object.entries(faq)
 
 const STOP = new Set(["com", "sem", "para", "uma", "uns", "das", "dos", "que", "por", "mais", "quero", "queria", "fazer", "marcar", "marcacao", "favor"]);
 
+// Distância entre duas palavras (letras trocadas, a mais ou a menos)
+function distance(a, b) {
+  let prev = Array.from({ length: b.length + 1 }, (_, i) => i);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= b.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[b.length];
+}
+
+// A palavra escrita bate numa palavra do serviço? Aceita erros de escrita
+// ("cordeletes" → cordoletes, "trancas" → tranças) em palavras de 5+ letras
+function wordMatches(w, nome) {
+  return nome.split(" ").some(sw => {
+    const base = sw.replace(/s$/, "");
+    if (sw.startsWith(w)) return true;
+    if (w.length < 5 || base.length < 4) return false;
+    return distance(w, base) <= (w.length >= 8 ? 2 : 1);
+  });
+}
+
 // Serviços com preço que se parecem com o texto ("corte", "unhas de gel", "tranças"):
 // { opcoes, porArea } (porArea: nenhum nome bate, só a área)
 function candidates(text) {
   const words = normalize(text).split(" ").filter(w => w.length >= 3 && !STOP.has(w)).map(w => w.replace(/s$/, ""));
   const scored = PRICED
-    .map(s => ({ s, score: words.filter(w => ` ${normalize(s)}`.includes(` ${w}`)).length }))
+    .map(s => ({ s, score: words.filter(w => wordMatches(w, normalize(s))).length }))
     .filter(c => c.score);
   const top = Math.max(0, ...scored.map(c => c.score));
   const found = scored.filter(c => c.score === top).map(c => c.s);
@@ -121,8 +143,8 @@ function resolveService(text) {
   if (found && agenda.priceFor(found) && opcoes.includes(found)) return { servico: found };
   // Serviço sob consulta (box braids, knotless…): a equipa diz o valor
   if (SOB_CONSULTA.includes(found) && porArea) return { servico: found };
-  if (opcoes.length === 1) return { servico: opcoes[0] };
-  if (opcoes.length) return { opcoes };
+  if (opcoes.length === 1) return { servico: opcoes[0], porArea };
+  if (opcoes.length) return { opcoes, porArea };
   return found ? { servico: found } : {};
 }
 
@@ -444,7 +466,9 @@ function answer(from, text, { interactiveId, profileName } = {}) {
     }
 
     case "nome":
-      f.nome = interactiveId === "book_nome_perfil" && profileName ? profileName : capitalize(value.slice(0, 40));
+      // "Sou a Josefa", "chamo-me Ana" → só o nome
+      f.nome = interactiveId === "book_nome_perfil" && profileName ? profileName
+        : capitalize(value.replace(/^(?:(?:eu\s+)?sou|chamo-me|me chamo|o meu nome [eé]|meu nome [eé]|nome:?)\s+(?:a\s+|o\s+)?/i, "").trim().slice(0, 40));
       if (!f.nome) return { reply: prompt(f, profileName) };
       break;
   }

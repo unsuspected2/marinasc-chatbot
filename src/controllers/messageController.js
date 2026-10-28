@@ -390,7 +390,14 @@ async function sendBookingStep(to, result, name) {
   await notifyTeam(`📅 *${substituida ? "Remarcação" : "Novo pedido de marcação"}*\n\n${agendaService.describe(marcacao, { withClient: true })}`
     + (substituida ? `\n   (substitui #${substituida.codigo})` : "")
     + (marcacao.sinal && !pago ? `\n   💳 Sinal pedido: ${agendaService.kz(marcacao.sinal.valor)}` : !marcacao.sinal ? "\n   💳 Preço sob consulta: diga à cliente o valor do sinal (30%)" : "")
-    + `\n\nQuando o sinal entrar na conta: /confirmar ${marcacao.codigo}\nPara recusar: /recusar ${marcacao.codigo} motivo`);
+    + fakeWarning(to)
+    + `\n\nQuando o sinal entrar na conta: /confirmar ${marcacao.codigo}\nPara recusar: /recusar ${marcacao.codigo} motivo`, marcacao.codigo);
+}
+
+// Aviso para a equipa: esta cliente já enviou um comprovativo falso
+function fakeWarning(cliente) {
+  const falsos = agendaService.all().filter(x => x.cliente === cliente && x.comprovativoInvalido);
+  return falsos.length ? `\n   ⚠️ Atenção: esta cliente já enviou um comprovativo falso (#${falsos.map(x => x.codigo).join(", #")})` : "";
 }
 
 // -------------------------------------------------------
@@ -398,10 +405,10 @@ async function sendBookingStep(to, result, name) {
 // escrito ao bot nas últimas 24 h; senão o pedido continua na agenda
 // (/agenda) e no link "Enviar à equipa" do cliente.
 // -------------------------------------------------------
-async function notifyTeam(text) {
+async function notifyTeam(text, codigo) {
   for (const admin of adminService.ADMINS) {
     try {
-      await whatsappService.sendTextMessage(admin, text);
+      adminService.rememberNotice(await whatsappService.sendTextMessage(admin, text), codigo);
     } catch {
       logger.warn("Não foi possível avisar a equipa pelo bot (janela de 24 h?)", { admin });
     }
@@ -502,18 +509,19 @@ async function handleReceipt(to, type, mediaId) {
   if (!m) return false;
   const atrasado = m.estado === "expirada" || !agendaService.upcomingOf(to).some(x => x.codigo === m.codigo);
   const c = agendaService.setState(m.codigo, m.estado || "pendente", { comprovativoEm: new Date().toISOString() });
-  const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}${atrasado ? " ⌛ chegou depois do prazo" : ""}\n${agendaService.describe(c, { withClient: true })}\n\nVerifique a transferência na conta e depois: /confirmar ${c.codigo}`
-    + (atrasado ? " (o bot avisa se a hora já tiver sido ocupada)" : "");
+  const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}${atrasado ? " ⌛ chegou depois do prazo" : ""}\n${agendaService.describe(c, { withClient: true })}${fakeWarning(to)}\n\n`
+    + `Verifique a transferência na conta. Responda a esta mensagem com *entrou* ou *falso*, ou use /confirmar ${c.codigo} · /falso ${c.codigo}`
+    + (atrasado ? "\n(se confirmar, o bot avisa se a hora já tiver sido ocupada)" : "");
   let enviado = false;
   for (const admin of adminService.ADMINS) {
     try {
-      await whatsappService.forwardMedia(admin, mediaId, type, legenda);
+      adminService.rememberNotice(await whatsappService.forwardMedia(admin, mediaId, type, legenda), c.codigo);
       enviado = true;
     } catch (err) {
       logger.warn("Não foi possível reenviar o comprovativo à equipa", { admin, erro: err.message });
     }
   }
-  if (!enviado) await notifyTeam(legenda.replace("Comprovativo", "Chegou o comprovativo"));
+  if (!enviado) await notifyTeam(legenda.replace("Comprovativo", "Chegou o comprovativo"), c.codigo);
   const text = atrasado
     ? `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! Chegou depois do prazo e a vaga já tinha sido libertada: a equipa verifica a transferência e, se a hora continuar livre, confirma-a aqui; se não, combina outra hora consigo.`
     : `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! A equipa verifica a transferência e confirma a sua marcação aqui.`;
@@ -592,6 +600,15 @@ async function handleIncomingMessage(req, res) {
 
     if (!adminService.isAdmin(from)) statsService.recordMessage(from);
     await expireBookings();
+
+    // Equipa: conversa própria, nunca a das clientes ("comprovativo falso"
+    // não é uma cliente a pedir ajuda). /cliente liga o modo de teste.
+    if (adminService.isAdmin(from) && !adminService.isClientMode(from)) {
+      const reply = await adminService.handleAdminMessage(from, { type, text, interactiveId: parsed.interactiveId, replyTo: parsed.replyTo });
+      if (reply.buttons?.length) await whatsappService.sendButtons(from, reply.text, reply.buttons);
+      else await whatsappService.sendTextMessage(from, reply.text);
+      return;
+    }
 
     // Bot em pausa (/pausa): só o link da equipa, uma vez por cliente
     if (adminService.isPaused() && !adminService.isAdmin(from)) {
@@ -696,8 +713,12 @@ async function handleText(from, name, text, lang) {
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.rescheduleTriggers)) return sendMyBookings(from, "remarcar");
   if (containsTrigger(normalizedText, KEYWORD_FLOWS.myBookingsTriggers)) return sendMyBookings(from, "ver");
 
-  // D. Pedido de marcação → pré-marcação guiada
-  if (containsTrigger(normalizedText, KEYWORD_FLOWS.bookingTriggers) && !bookingService.isActive(from)) {
+  // D. Pedido de marcação → pré-marcação guiada. "Quero tranças bobe para
+  // amanhã" também é pedido de marcação (sem pergunta de preço)
+  const queroServico = containsTrigger(normalizedText, ["quero", "queria", "gostaria", "pretendo"])
+    && !text.includes("?") && !containsTrigger(normalizedText, KEYWORD_FLOWS.priceTriggers)
+    && (({ servico, opcoes, porArea }) => Boolean(servico || (opcoes && !porArea)))(bookingService.resolveService(text));
+  if ((queroServico || containsTrigger(normalizedText, KEYWORD_FLOWS.bookingTriggers)) && !bookingService.isActive(from)) {
     logger.info("Início de pré-marcação", { from });
     aiService.addToHistory(from, "user", text);
     await startBooking(from, text, name);
