@@ -10,8 +10,8 @@ pré-marcações. As opções aparecem como respostas rápidas (botões por baix
    profissional → Empresa (se ainda não for).
 2. **Permitir o acesso às mensagens.** No Instagram: Definições → Mensagens e respostas a stories →
    Ferramentas ligadas → activar **Permitir acesso às mensagens**.
-3. **Adicionar o Instagram à app da Meta.** Em developers.facebook.com → app **wawabusinees** →
-   Adicionar produto → **Instagram** → **Configuração da API com login do Instagram**.
+3. ~~**Adicionar o Instagram à app da Meta.**~~ Feito a 29/10/2026: a app **wawabusinees** já tem o
+   produto Instagram (Instagram → API setup with Instagram login; app do Instagram `wawabusinees-IG`).
 4. **Gerar o token.** Em "Gerar tokens de acesso" → Adicionar conta → entrar com o Instagram do salão →
    copiar o token. Colá-lo no `.env` numa linha `INSTAGRAM_TOKEN=...` (não o envie por mensagem).
 5. **Segredo da app do Instagram.** Na mesma página aparece o "Segredo da app do Instagram". Colá-lo no
