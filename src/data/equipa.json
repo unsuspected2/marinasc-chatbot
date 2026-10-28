@@ -1,9 +1,30 @@
 {
   "_ajuda": "Números com acesso aos comandos da equipa (/agenda, /confirmar…) e que recebem os avisos de marcações e comprovativos. Número com o código 244, só algarismos. Ver docs/COMO-USAR.md.",
   "admins": [
-    { "numero": "244946397096", "nome": "Equipa", "cargo": "WhatsApp do salão" },
-    { "numero": "244941051108", "nome": "Eng. Josaid do Nascimento", "cargo": "Marketing (CEO)" },
-    { "numero": "244921610705", "nome": "Sra. Marisa", "cargo": "CEO, dona do MARINAS BOSS" },
-    { "numero": "244931376018", "nome": "Josefa do Nascimento", "cargo": "Gerente oficial" }
+    {
+      "numero": "244946397096",
+      "nome": "Equipa",
+      "cargo": "WhatsApp do salão"
+    },
+    {
+      "numero": "244941051108",
+      "nome": "Eng. Josaid do Nascimento",
+      "cargo": "Marketing (CEO)"
+    },
+    {
+      "numero": "244925559711",
+      "nome": "Sr. Nascimento",
+      "cargo": "CEO, dono da MARINASC"
+    },
+    {
+      "numero": "244921610705",
+      "nome": "Sra. Marisa",
+      "cargo": "CEO, dona do MARINAS BOSS"
+    },
+    {
+      "numero": "244931376018",
+      "nome": "Josefa do Nascimento",
+      "cargo": "Gerente oficial"
+    }
   ]
 }

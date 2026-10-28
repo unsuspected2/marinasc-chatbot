@@ -86,6 +86,7 @@ o comando `/equipa` mostra-a):
 |---|---|
 | 946 397 096 | WhatsApp do salão (equipa) |
 | 941 051 108 | Eng. Josaid do Nascimento, Marketing (CEO) |
+| 925 559 711 | Sr. Nascimento, CEO, dono da MARINASC |
 | 921 610 705 | Sra. Marisa, CEO, dona do MARINAS BOSS |
 | 931 376 018 | Josefa do Nascimento, gerente oficial |
 
