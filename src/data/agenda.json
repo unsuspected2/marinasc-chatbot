@@ -3,9 +3,10 @@
   "intervalo_min": 30,
   "antecedencia_min": 60,
   "sinal": {
-    "_ajuda": "Sinal pedido em cada marcação (percentagem do preço da tabela, arredondado aos 100 Kz) e conta para a transferência. Ver docs/GUIA.md, secção Sinal.",
+    "_ajuda": "Sinal pedido em cada marcação (percentagem do preço da tabela, arredondado aos 100 Kz), conta para a transferência e prazo para enviar o comprovativo (horas; nunca depois de 1 h antes da marcação). Sem comprovativo no prazo, o pedido expira e a vaga fica livre. Ver docs/COMO-USAR.md.",
     "percentagem": 30,
-    "iban": "AO06.0006.0000.7839.6727.3011.1"
+    "iban": "AO06.0006.0000.7839.6727.3011.1",
+    "prazo_horas": 24
   },
   "areas": {
     "barbearia": {

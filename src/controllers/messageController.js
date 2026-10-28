@@ -493,10 +493,16 @@ async function transcribeIncomingAudio(mediaId) {
 // -------------------------------------------------------
 async function handleReceipt(to, type, mediaId) {
   if (!["image", "document"].includes(type)) return false;
-  const m = agendaService.upcomingOf(to).find(x => x.estado === "pendente" && !x.sinalPago && !x.comprovativoEm);
+  const hoje = horario.agora().data;
+  // O pedido à espera do sinal; senão, um que expirou há pouco (comprovativo fora do prazo)
+  const m = agendaService.upcomingOf(to).find(agendaService.semSinal)
+    || agendaService.all().filter(x => x.cliente === to && x.dia >= hoje && !x.comprovativoEm
+      && (x.estado === "expirada" || agendaService.semSinal(x))).pop();
   if (!m) return false;
-  const c = agendaService.setState(m.codigo, "pendente", { comprovativoEm: new Date().toISOString() });
-  const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}\n${agendaService.describe(c, { withClient: true })}\n\nVerifique a transferência na conta e depois: /confirmar ${c.codigo}`;
+  const atrasado = m.estado === "expirada" || !agendaService.upcomingOf(to).some(x => x.codigo === m.codigo);
+  const c = agendaService.setState(m.codigo, m.estado || "pendente", { comprovativoEm: new Date().toISOString() });
+  const legenda = `💳 Comprovativo do sinal de #${c.codigo}${c.sinal ? ` (${agendaService.kz(c.sinal.valor)})` : ""}${atrasado ? " ⌛ chegou depois do prazo" : ""}\n${agendaService.describe(c, { withClient: true })}\n\nVerifique a transferência na conta e depois: /confirmar ${c.codigo}`
+    + (atrasado ? " (o bot avisa se a hora já tiver sido ocupada)" : "");
   let enviado = false;
   for (const admin of config.adminNumbers) {
     try {
@@ -507,7 +513,9 @@ async function handleReceipt(to, type, mediaId) {
     }
   }
   if (!enviado) await notifyTeam(legenda.replace("Comprovativo", "Chegou o comprovativo"));
-  const text = `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! A equipa verifica a transferência e confirma a sua marcação aqui.`;
+  const text = atrasado
+    ? `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! Chegou depois do prazo e a vaga já tinha sido libertada: a equipa verifica a transferência e, se a hora continuar livre, confirma-a aqui; se não, combina outra hora consigo.`
+    : `💳 Recebemos o comprovativo da marcação #${c.codigo}, obrigada! A equipa verifica a transferência e confirma a sua marcação aqui.`;
   if (enviado) {
     await whatsappService.sendTextMessage(to, text);
   } else {
@@ -582,6 +590,7 @@ async function handleIncomingMessage(req, res) {
     }
 
     if (!adminService.isAdmin(from)) statsService.recordMessage(from);
+    await expireBookings();
 
     // Bot em pausa (/pausa): só o link da equipa, uma vez por cliente
     if (adminService.isPaused() && !adminService.isAdmin(from)) {
@@ -796,4 +805,20 @@ function verifyWebhook(req, res) {
   return res.status(403).json({ error: "Forbidden: token inválido" });
 }
 
-module.exports = { handleIncomingMessage, verifyWebhook };
+// -------------------------------------------------------
+// Pedidos sem comprovativo dentro do prazo: liberta a vaga e avisa a
+// cliente e a equipa. Corre de 15 em 15 minutos (cron da Cloudflare)
+// e antes de cada mensagem.
+// -------------------------------------------------------
+async function expireBookings() {
+  for (const m of agendaService.expireOverdue()) {
+    logger.info("⌛ Pedido expirado sem sinal", { codigo: m.codigo, cliente: m.cliente });
+    await whatsappService.sendTextMessage(m.cliente,
+      `⌛ O prazo para enviar o comprovativo do sinal da marcação #${m.codigo} (${m.servico}, ${agendaService.dayText(m.dia)}, às ${agendaService.horaLabel(m.inicio)}) terminou e a vaga foi libertada.\n\n`
+      + "Se já fez a transferência, envie aqui o comprovativo e a equipa vê se a hora continua livre. Para escolher outra hora, escreva *marcar*. 💖")
+      .catch(() => logger.warn("Não foi possível avisar a cliente da marcação expirada (janela de 24 h?)", { codigo: m.codigo }));
+    await notifyTeam(`⌛ *Pedido expirado (sem comprovativo do sinal)*\n\n${agendaService.describe(m, { withClient: true })}\n\nA vaga ficou livre.`);
+  }
+}
+
+module.exports = { handleIncomingMessage, verifyWebhook, expireBookings };

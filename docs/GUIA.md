@@ -69,7 +69,7 @@ Ficheiro: **`src/data/agenda.json`**. É este que decide quando uma hora está c
 - `duracoes` → duração de serviços que fogem à regra da área (ex.: `"Micro twists": 360`).
 - `intervalo_min` → de quanto em quanto tempo o bot oferece horas (30 = 9h, 9h30, 10h…).
 - `antecedencia_min` → com quanta antecedência se pode marcar para hoje (60 = só daqui a 1 hora).
-- `sinal` → `percentagem` (30) e `iban` da empresa. O valor do sinal sai do preço da tabela
+- `sinal` → `percentagem` (30), `iban` da empresa e `prazo_horas` (24) para o comprovativo. O valor do sinal sai do preço da tabela
   (`src/data/faq.json`), arredondado aos 100 Kz. Regras das faltas: [COMO-USAR.md](COMO-USAR.md#sinal-e-faltas-regras-do-salão).
 
 ### Sinal

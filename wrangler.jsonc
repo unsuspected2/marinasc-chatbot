@@ -17,6 +17,8 @@
     "bindings": [{ "name": "BOT", "class_name": "Bot" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Bot"] }],
+  // De 15 em 15 minutos: liberta as vagas dos pedidos sem comprovativo do sinal no prazo (24 h)
+  "triggers": { "crons": ["*/15 * * * *"] },
   // Valores que não são segredo. Os segredos (WHATSAPP_TOKEN, VERIFY_TOKEN,
   // GROQ_API_KEY…) vão com: npx wrangler secret put NOME
   "vars": {

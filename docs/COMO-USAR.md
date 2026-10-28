@@ -42,6 +42,15 @@ Horário e localização · Marcar · Falar com a equipa. Os números ("1" a "9"
 
 - **Toda a marcação pede um sinal de 30%** do valor do serviço, por transferência para o IBAN
   **AO06.0006.0000.7839.6727.3011.1**. O resto paga-se no salão.
+- **Prazo do comprovativo: 24 horas** depois do pedido (ou até 1 h antes da hora marcada, se for mais
+  cedo). A cliente vê o prazo na mensagem do pedido. Sem comprovativo no prazo, o pedido **expira**
+  (⌛): a vaga fica logo livre para outra cliente, e a cliente e a equipa são avisadas. O bot verifica
+  isto de 15 em 15 minutos.
+- **Comprovativo depois do prazo:** o bot reenvia-o à equipa com "⌛ chegou depois do prazo". A equipa
+  pode fazer `/confirmar K7Q2` na mesma: se a hora ainda estiver livre, fica confirmada; se já tiver
+  sido ocupada, o bot avisa para combinar outra hora com a cliente.
+- **Só horas livres:** a cliente só pode escolher horas sem marcações. Se escrever uma hora ocupada, o
+  bot recusa e sugere as 3 horas livres mais perto.
 - Serviços **sem preço na tabela** (sob consulta): o bot diz "30% do valor" e a equipa diz o valor à
   cliente.
 - **Remarcar** (a cliente escreve *remarcar*): o sinal já pago passa para a nova marcação.
@@ -103,7 +112,7 @@ Se já houver marcações no período bloqueado, o bot mostra-as para as cancela
 
 | Comando | Para quê |
 |---|---|
-| `/marcacoes` | os últimos 10 pedidos, com o estado (⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou; 💳 = sinal) |
+| `/marcacoes` | os últimos 10 pedidos, com o estado (⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou · ⌛ expirada; 💳 = sinal) |
 | `/stats` | conversas de hoje e da semana, pedidos, serviços mais pedidos, quantos estão por confirmar |
 | `/promo 10% nas tranças até sexta` · `/promo off` | liga ou desliga a promoção |
 | `/pausa` · `/retomar` | o bot deixa de atender (só envia o link do 946) e volta a atender |

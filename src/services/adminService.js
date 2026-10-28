@@ -105,8 +105,13 @@ async function handleCommand(from, text) {
       const m = agenda.find(codigo);
       if (!m) return `Não encontrei a marcação ${codigo || ""}. Veja os códigos com /agenda.`;
       const estado = (m.estado || "pendente");
-      if (!["pendente", "confirmada"].includes(estado)) return `A marcação #${m.codigo} já está ${estado}.`;
-      if (cmd.toLowerCase() === "/confirmar") {
+      const confirmar = cmd.toLowerCase() === "/confirmar";
+      // Um pedido expirado (sinal fora do prazo) ainda se confirma se a hora continuar livre
+      if (confirmar && estado === "expirada") {
+        const why = agenda.whyNot(m.dia, m.inicio, m.servico, { ignore: m.codigo });
+        if (why === "ocupado" || why === "bloqueado") return `⌛ #${m.codigo} expirou e a hora já foi ocupada. Combine outra hora com a cliente (wa.me/${m.cliente}) e registe-a com /ocupar.`;
+      } else if (!["pendente", "confirmada"].includes(estado)) return `A marcação #${m.codigo} já está ${estado}.`;
+      if (confirmar) {
         if (estado === "confirmada") return `A marcação #${m.codigo} já estava confirmada.`;
         const c = agenda.setState(m.codigo, "confirmada", { por: from, ...(m.sinal && { sinalPago: true }) });
         const nota = await tellClient(c, `✅ *Marcação confirmada!*\n\n${c.servico}, ${agenda.dayText(c.dia)}, às ${agenda.horaLabel(c.inicio)} (#${c.codigo}).${c.sinal ? `\n💳 Sinal de ${agenda.kz(c.sinal.valor)} recebido; o resto paga no salão.` : ""}\n📍 Centralidade do Kilamba, Edifício C19, Apt. 41.\n\nSe precisar de mudar, escreva *remarcar*; para cancelar, *cancelar marcação*. Até lá! 💖`);
@@ -169,7 +174,7 @@ async function handleCommand(from, text) {
     case "/marcações": {
       const ultimas = agenda.all().filter(m => m.codigo).slice(-10).reverse();
       if (!ultimas.length) return "Ainda não há pedidos de marcação.";
-      return `📅 *Últimos pedidos*\n\n${ultimas.map(m => agenda.describe(m, { withClient: true })).join("\n")}\n\n⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou`;
+      return `📅 *Últimos pedidos*\n\n${ultimas.map(m => agenda.describe(m, { withClient: true })).join("\n")}\n\n⏳ pendente · ✅ confirmada · ❌ recusada · 🚫 cancelada · ⚠️ faltou · ⌛ expirada (sem sinal no prazo)`;
     }
 
     case "/promo": {

@@ -9,7 +9,8 @@
 // enquanto a equipa não confirma.
 //
 // Estados: pendente → confirmada | recusada; cancelada (cliente ou equipa);
-// faltou (a cliente não apareceu: o sinal fica retido, ver docs/GUIA.md)
+// faltou (a cliente não apareceu: o sinal fica retido, ver docs/GUIA.md);
+// expirada (pedido sem comprovativo do sinal dentro do prazo: a vaga é libertada)
 //
 // Sinal: cada marcação pede 30% do preço da tabela (agenda.json → sinal),
 // por transferência. A equipa confirma depois de ver o dinheiro na conta.
@@ -90,7 +91,8 @@ function depositText(m) {
   const valor = m.sinal?.valor
     ? `*${kz(m.sinal.valor)}* (${s.percentagem}% de ${m.sinal.aPartirDe ? "a partir de " : ""}${kz(m.sinal.preco)})`
     : `${s.percentagem}% do valor do serviço (a equipa diz-lhe o valor exacto)`;
-  return `💳 *Sinal para garantir a vaga:* ${valor}\nTransferência para o IBAN:\n${s.iban}\nDepois envie aqui a foto ou o PDF do comprovativo. O resto paga no salão.`;
+  const prazo = m.criadaEm ? ` até ${prazoTexto(m)}; sem ele, a vaga é libertada para outra cliente` : "";
+  return `💳 *Sinal para garantir a vaga:* ${valor}\nTransferência para o IBAN:\n${s.iban}\nDepois envie aqui a foto ou o PDF do comprovativo${prazo}. O resto paga no salão.`;
 }
 
 const POLICY = "Se não puder vir, avise com antecedência (escreva *remarcar* ou *cancelar marcação*). "
@@ -133,10 +135,54 @@ function find(codigo) {
   return all().find(m => m.codigo === c) || null;
 }
 
+// -------------------------------------------------------
+// Prazo do sinal: 24 h depois do pedido, ou 1 h antes da hora marcada
+// se for mais cedo. Sem comprovativo até lá, o pedido expira e a vaga
+// fica livre para outra cliente.
+// -------------------------------------------------------
+const PRAZO_MS = (agenda.sinal?.prazo_horas ?? 24) * 60 * 60 * 1000;
+
+// Luanda está sempre em UTC+1 (sem hora de Verão)
+const inicioMs = m => Date.parse(`${m.dia}T00:00:00+01:00`) + m.inicio * 60000;
+
+function prazoSinal(m) {
+  if (!m.sinal && m.origem !== "bot") return null;
+  const criada = Date.parse(m.criadaEm);
+  return new Date(Math.max(criada + 60 * 60000, Math.min(criada + PRAZO_MS, inicioMs(m) - 60 * 60000)));
+}
+
+function semSinal(m) {
+  return (m.estado || "pendente") === "pendente" && m.origem === "bot" && !m.sinalPago && !m.comprovativoEm;
+}
+
+function overdue(m, now = Date.now()) {
+  return semSinal(m) && prazoSinal(m) && prazoSinal(m).getTime() <= now;
+}
+
+function isActive(m) {
+  return ACTIVE.includes(m.estado || "pendente") && !overdue(m);
+}
+
+// "sexta-feira, 30/10, às 14h" (hora de Luanda)
+function prazoTexto(m) {
+  const t = horario.agora(prazoSinal(m));
+  return `${dayText(t.data)}, às ${horaLabel(t.minutos)}`;
+}
+
+// Passa a "expirada" os pedidos fora do prazo; devolve-os para avisar
+function expireOverdue() {
+  const list = all();
+  const now = Date.now();
+  const expiradas = list.filter(m => overdue(m, now));
+  for (const m of expiradas) Object.assign(m, { estado: "expirada", expiradaEm: new Date(now).toISOString() });
+  if (expiradas.length) saveAll(list);
+  return expiradas;
+}
+
 // Marcações activas (pendentes e confirmadas) de um dia
 function ofDay(iso) {
   return all()
-    .filter(m => m.dia === iso && ACTIVE.includes(m.estado || "pendente") && m.inicio !== undefined)
+    .filter(m => m.dia === iso && isActive(m) && m.inicio !== undefined)
     .sort((a, b) => a.inicio - b.inicio);
 }
 
@@ -144,7 +190,7 @@ function ofDay(iso) {
 function upcomingOf(cliente) {
   const t = horario.agora();
   return all()
-    .filter(m => m.cliente === cliente && ACTIVE.includes(m.estado || "pendente")
+    .filter(m => m.cliente === cliente && isActive(m)
       && (m.dia > t.data || (m.dia === t.data && (m.inicio ?? 0) >= t.minutos)))
     .sort((a, b) => (a.dia + String(a.inicio).padStart(4, "0")).localeCompare(b.dia + String(b.inicio).padStart(4, "0")));
 }
@@ -288,7 +334,7 @@ function dayText(iso) {
   return `${prefix}${wd}, ${d}/${m}`;
 }
 
-const ESTADO_EMOJI = { pendente: "⏳", confirmada: "✅", recusada: "❌", cancelada: "🚫", faltou: "⚠️" };
+const ESTADO_EMOJI = { pendente: "⏳", confirmada: "✅", recusada: "❌", cancelada: "🚫", faltou: "⚠️", expirada: "⌛" };
 
 function describe(m, { withClient = false } = {}) {
   const fim = horaLabel(m.inicio + m.duracao);
@@ -302,4 +348,5 @@ module.exports = {
   all, find, ofDay, upcomingOf, blocks,
   whyNot, freeSlots, nextFreeDay, nearest,
   create, setState, block, unblock, describe,
+  prazoSinal, prazoTexto, semSinal, expireOverdue,
 };

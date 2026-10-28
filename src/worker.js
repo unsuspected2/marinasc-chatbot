@@ -6,6 +6,7 @@
 // POST /webhook  → responde 200 logo e passa a mensagem ao Durable
 //                  Object "Bot", que corre o mesmo código do PC
 // GET  /health   → estado
+// cron (15 min)  → liberta os pedidos sem comprovativo do sinal no prazo
 // Tudo o resto   → o site (pasta site/)
 //
 // Há um só Durable Object: as mensagens são tratadas por ordem e os
@@ -60,6 +61,10 @@ export class Bot extends DurableObject {
       const dia = store.readJson("conversas.json", { dias: {} }).dias[t];
       return Response.json({ ...store.readJson("ultima-mensagem.json", {}), mensagensHoje: dia?.mensagens || 0 });
     }
+    if (new URL(request.url).pathname === "/expirar") {
+      await controller.expireBookings().catch(err => logger.error("Erro a expirar pedidos", err));
+      return new Response("ok");
+    }
     const body = await request.json();
     if (body?.entry?.[0]?.changes?.[0]?.value?.messages || body?.entry?.[0]?.messaging) {
       store.writeJson("ultima-mensagem.json", { ultimaMensagem: new Date().toISOString() });
@@ -106,5 +111,10 @@ export default {
     }
 
     return env.ASSETS.fetch(request);
+  },
+
+  async scheduled(_event, env, ctx) {
+    const bot = env.BOT.get(env.BOT.idFromName("marinasc"));
+    ctx.waitUntil(bot.fetch("https://bot/expirar", { method: "POST" }));
   },
 };
