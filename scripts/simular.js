@@ -42,12 +42,22 @@ const aiService = require("../src/services/aiService");
 // (com o destinatário quando não é quem escreveu: aviso à equipa ou a outro cliente)
 let current = null;
 const show = (to, text) => console.log(`🤖${to !== current ? ` → ${to}` : ""} ${text.replace(/\n/g, "\n   ")}\n`);
-whatsappService.sendTextMessage = async (to, text) => show(to, text);
-whatsappService.sendButtons = async (to, text, buttons) =>
+// Instagram: passa pelo instagramService a sério (opções numeradas); só o envio é falso
+const instagram = require("../src/services/instagramService");
+const realFetch = global.fetch;
+global.fetch = async (url, opts) => {
+  if (!String(url).includes("graph.instagram.com")) return realFetch(url, opts);
+  const { message } = JSON.parse(opts.body);
+  if (message) show(current, message.text);
+  return { ok: true, json: async () => ({}) };
+};
+require("../src/config/env").instagramToken ||= "simulado";
+whatsappService.sendTextMessage = async (to, text) => instagram.isInstagram(to) ? instagram.sendText(to, text) : show(to, text);
+whatsappService.sendButtons = async (to, text, buttons) => instagram.isInstagram(to) ? instagram.sendText(to, text, buttons) :
   show(to, `${text}\n${buttons.map(b => `[ ${b.title} ]`).join("  ")}`);
-whatsappService.sendList = async (to, { body, button }, sections) =>
+whatsappService.sendList = async (to, { body, button }, sections) => instagram.isInstagram(to) ? instagram.sendText(to, body, sections.flatMap(s => s.rows)) :
   show(to, `${body}\n[ ${button} ▾ ]\n${sections.map(s => `  ${s.title}:\n${s.rows.map(r => `   • ${r.title} (${r.id})`).join("\n")}`).join("\n")}`);
-whatsappService.sendLinkButton = async (to, text, label, url) =>
+whatsappService.sendLinkButton = async (to, text, label, url) => instagram.isInstagram(to) ? instagram.sendText(to, `${text}\n\n👉 ${label}: ${url}`) :
   show(to, `${text}\n[ ${label} ↗ ${decodeURIComponent(url)} ]`);
 whatsappService.forwardMedia = async (to, id, type, caption) => show(to, `[${type} reenviado] ${caption}`);
 whatsappService.markAsRead = async () => {};
@@ -130,6 +140,15 @@ const EXEMPLOS = [
   // Instagram: o mesmo bot, com respostas rápidas
   "(instagram) qt custa as tranças nagô?",
   "(instagram) [btn_marcar]",
+  // Instagram no computador: sem respostas rápidas, escolhe pelo número
+  "(instagram) se eu quiser marcar, o que faço",
+  "(instagram) 1",
+  "(instagram) cordoletes",
+  "(instagram) onde posso verificar a agenda para escolher a data",
+  "(instagram) 2",
+  "(instagram) 10",
+  "(instagram) 13h",
+  "(instagram) Ana",
 ];
 
 let contador = 0;

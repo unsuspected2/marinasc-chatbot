@@ -119,7 +119,7 @@ function servicePicker(opcoes, offset = 0, intro = "Qual destes serviços?") {
   const rows = page.map(serviceRow);
   if (offset + page.length < opcoes.length) rows.push({ id: `book_mais_${offset + page.length}`, title: "Ver mais ➡️", description: `Mais ${opcoes.length - offset - page.length} serviços` });
   return {
-    text: `${intro} Toque em *Escolher serviço*: em cada um vê o preço e o sinal de ${agenda.sinalPercent()}% a transferir.`,
+    text: `${intro} Escolha o serviço: em cada um vê o preço e o sinal de ${agenda.sinalPercent()}% a transferir.`,
     list: { button: "Escolher serviço", sections: [{ title: "Serviços", rows }] },
   };
 }
@@ -261,15 +261,7 @@ function prompt(f, profileName) {
     case "servico":
       return f.opcoes ? servicePicker(f.opcoes, 0, "📅 Vamos preparar a sua marcação!") : categoryPicker();
     case "dia": {
-      // Os 3 próximos dias com vaga para este serviço
-      const dias = [];
-      let from = horario.agora().data;
-      while (dias.length < 3) {
-        const n = agenda.nextFreeDay(from, f.servico);
-        if (!n) break;
-        dias.push(n.dia);
-        from = agenda.addDays(n.dia, 1);
-      }
+      const dias = freeDays(f.servico, 3);
       const antes = f.semVaga ? `Para ${f.semVaga} já não há vagas para ${f.servico}. ` : `${f.servico}, óptimo! `;
       return {
         text: `${antes}Para que dia? Escolha um dia com vaga ou escreva outro (ex.: sábado, 15/11).`,
@@ -286,6 +278,32 @@ function prompt(f, profileName) {
     default:
       return null;
   }
+}
+
+// Os n próximos dias com vaga para este serviço
+function freeDays(servico, n) {
+  const dias = [];
+  let from = horario.agora().data;
+  while (dias.length < n) {
+    const d = agenda.nextFreeDay(from, servico);
+    if (!d) break;
+    dias.push(d.dia);
+    from = agenda.addDays(d.dia, 1);
+  }
+  return dias;
+}
+
+// "Quais dias há?", "onde vejo a agenda?" ou um dia que não percebeu:
+// mostra os próximos 7 dias com vaga numa lista
+function dayList(f, value) {
+  const pergunta = /agenda|dispon|livre|vaga|quais|que dias|quando/i.test(value);
+  const dias = freeDays(f.servico, 7);
+  const intro = pergunta ? "" : "Não percebi o dia 🙈 ";
+  if (!dias.length) return { text: `${intro}De momento não encontro vagas para ${f.servico}. Fale com a equipa no 946 397 096, por favor.` };
+  return {
+    text: `${intro}Estes são os próximos dias com vaga para ${f.servico}. Escolha um na lista ou escreva o dia (ex.: sábado, 15/11).`,
+    list: { button: "Ver dias livres", sections: [{ title: "Dias com vaga", rows: dias.map(d => ({ id: `book_dia_${d}`, title: shortDay(d), description: `${agenda.freeSlots(d, f.servico).length} horas livres` })) }] },
+  };
 }
 
 function capitalize(s) {
@@ -421,7 +439,8 @@ function answer(from, text, { interactiveId, profileName } = {}) {
         flows.save();
         return { reply: servicePicker(f.opcoes) };
       }
-      if (!r.servico && !f.tentouServico) {
+      // Só aceita texto livre que pareça o nome de um serviço (não "1", "ok", "o que faço?")
+      if (!r.servico && (!f.tentouServico || !/[a-zà-ú]{4,}/i.test(value) || /\?|o que|como|onde|quais/i.test(value))) {
         // Primeira vez sem perceber: mostra as áreas; à segunda aceita o que escreveu
         f.tentouServico = true;
         flows.save();
@@ -440,7 +459,7 @@ function answer(from, text, { interactiveId, profileName } = {}) {
         : interactiveId === "book_dia_amanha" ? parseDay("amanhã")
         : /^book_dia_\d{4}-\d{2}-\d{2}$/.test(interactiveId || "") ? dayFromIso(interactiveId.slice(9))
         : parseDay(value);
-      if (!dia) return { reply: { text: "Não percebi o dia 🙈 Pode escrever, por exemplo, *sábado*, *amanhã* ou *15/11*?" } };
+      if (!dia) return { reply: dayList(f, value) };
       if (!agenda.freeSlots(dia.data, f.servico).length) return noSlotsReply(f, dia);
       f.dia = dia;
       delete f.semVaga;

@@ -4,12 +4,17 @@
 // Instagram). O resto do bot não muda: os clientes do Instagram têm
 // o número "ig:<id>" e o whatsappService encaminha para aqui.
 //
-// O Instagram não tem listas nem botões com link: as opções vão como
-// respostas rápidas (até 13) e os links vão no texto.
+// O Instagram não tem listas nem botões com link: as opções vão
+// numeradas no texto (o Instagram no computador não mostra as respostas
+// rápidas) e também como respostas rápidas (até 13); os links vão no texto.
 // ============================================================
 
 const config = require("../config/env");
 const logger = require("../utils/logger");
+const store = require("../utils/store");
+
+// Últimas opções mostradas a cada cliente: "2" → o id da 2.ª opção
+const lastOptions = store.persistentMap("opcoes-instagram.json", 24 * 60 * 60 * 1000);
 
 const API = `https://graph.instagram.com/${process.env.GRAPH_API_VERSION || "v22.0"}/me/messages`;
 const PREFIX = "ig:";
@@ -34,8 +39,15 @@ async function post(payload) {
   return res.json();
 }
 
-// Texto, com respostas rápidas opcionais: [{ id, title }]
+// Texto, com opções opcionais: [{ id, title, description? }]
 async function sendText(to, text, quickReplies = []) {
+  if (quickReplies.length) {
+    // Horas não levam número: "10" tem de ser 10h, não a 10.ª opção
+    const horas = quickReplies.every(q => q.id.startsWith("book_hora_"));
+    const lines = quickReplies.map((q, i) => `${horas ? "•" : `${i + 1}.`} ${q.title}${q.description ? ` (${q.description})` : ""}`);
+    text = `${text}\n\n${lines.join("\n")}${horas ? "" : "\n\nResponda com o número da opção."}`;
+    lastOptions.set(to, { ids: quickReplies.map(q => q.id), titles: quickReplies.map(q => q.title), numeros: !horas, updatedAt: Date.now() });
+  }
   // O Instagram não tem *negrito* como o WhatsApp: tira os asteriscos
   text = text.replace(/\*([^*\n]+)\*/g, "$1");
   const parts = [];
@@ -90,6 +102,8 @@ function parse(body) {
   if (message.quick_reply?.payload) {
     return { ...base, type: "interactive", interactiveId: message.quick_reply.payload };
   }
+  const chosen = optionFor(base.from, base.text);
+  if (chosen) return { ...base, type: "interactive", interactiveId: chosen };
   const attachment = message.attachments?.[0];
   if (attachment) {
     const type = { audio: "audio", image: "image", video: "video", file: "document" }[attachment.type] || attachment.type;
@@ -97,6 +111,17 @@ function parse(body) {
     return { ...base, type, mediaId: attachment.payload?.url };
   }
   return base;
+}
+
+// "2", "opção 2" ou o próprio texto da opção → id da opção mostrada
+function optionFor(from, text) {
+  const opts = lastOptions.get(from);
+  if (!opts || !text) return null;
+  const n = /^(?:op[cç][aã]o\s*|n[uú]mero\s*)?(\d{1,2})\s*[.)]?$/i.exec(text.trim());
+  if (n) return opts.numeros ? opts.ids[+n[1] - 1] || null : null;
+  const norm = t => t.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
+  const i = opts.titles.findIndex(t => norm(t) === norm(text));
+  return i >= 0 ? opts.ids[i] : null;
 }
 
 async function downloadMedia(url) {
