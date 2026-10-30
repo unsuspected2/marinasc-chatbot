@@ -112,11 +112,6 @@ function detectLanguage(text) {
   const words = new Set(text.toLowerCase().split(/[^a-zà-ú]+/).filter(Boolean));
   const has = w => (w.includes(" ") ? text.toLowerCase().includes(w) : words.has(w));
 
-  // Em Luanda muita gente cumprimenta em inglês ("Good evening", "hi") mas fala
-  // português: um cumprimento sozinho não muda o idioma
-  const greetings = new Set(["hello", "hi", "hey", "good", "morning", "afternoon", "evening", "night"]);
-  if (words.size && [...words].every(w => greetings.has(w))) return config.defaultLanguage;
-
   const ptScore = ptWords.filter(has).length;
   const enScore = enWords.filter(has).length;
 
