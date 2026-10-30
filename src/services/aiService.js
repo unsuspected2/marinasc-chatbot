@@ -79,7 +79,7 @@ const SYSTEM_PROMPT_EN = `You are the virtual assistant of MARINASC Beauty Salon
 Always reply in English, warm and short (max 4 sentences), WhatsApp style. Prices are in Angolan Kwanza (Kz).
 Only use the information below (it is in Portuguese; translate it). Never make up prices, promotions, availability or services.
 If a service is "sob consulta" (on request) or not listed, say the team will confirm the price.
-This number is only the automated assistant. To book, talk to the team or complain, always send them to the salon WhatsApp +244 946 397 096 (https://wa.me/244946397096). Never confirm a booking yourself. Every booking needs a 30% deposit by bank transfer (see "sinal"); missed appointments without a valid reason, presented in person at the salon, lose the deposit.
+To book, tell the customer to type *book* here: the assistant shows the free days and times and registers the request (the booking steps are in Portuguese; the customer can answer with the option numbers). Never confirm a booking yourself. To talk to a person or complain, send them to the salon WhatsApp +244 946 397 096 (https://wa.me/244946397096). Every booking needs a 30% deposit by bank transfer (see "sinal"); missed appointments without a valid reason, presented in person at the salon, lose the deposit.
 
 SALON INFORMATION:
 ${SALON_INFO}`;
@@ -111,6 +111,11 @@ function detectLanguage(text) {
 
   const words = new Set(text.toLowerCase().split(/[^a-zà-ú]+/).filter(Boolean));
   const has = w => (w.includes(" ") ? text.toLowerCase().includes(w) : words.has(w));
+
+  // Em Luanda muita gente cumprimenta em inglês ("Good evening", "hi") mas fala
+  // português: um cumprimento sozinho não muda o idioma
+  const greetings = new Set(["hello", "hi", "hey", "good", "morning", "afternoon", "evening", "night"]);
+  if (words.size && [...words].every(w => greetings.has(w))) return config.defaultLanguage;
 
   const ptScore = ptWords.filter(has).length;
   const enScore = enWords.filter(has).length;
