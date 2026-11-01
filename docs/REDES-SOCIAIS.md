@@ -5,6 +5,7 @@
 | Instagram | @marynasc_salao_de_beleza_ | fotos e Reels dos trabalhos, stories, mensagens (bot, depois de ligado) |
 | TikTok | @salo.marinasc | os mesmos vídeos curtos, para chegar a quem ainda não nos conhece |
 | Facebook | página MariNasc (link no Instagram) | os mesmos posts; partilhar a partir do Instagram |
+| LinkedIn | MARINASC Salão de Beleza (a criar: [LINKEDIN.md](LINKEDIN.md)) | página oficial, recrutamento, parcerias |
 | Google (Maps e Pesquisa) | MARINASC | quem procura "salão Kilamba": horário, preços, avaliações, direcções |
 | WhatsApp do bot | 955 705 188 | marcações 24 h; a equipa confirma no 946 397 096 |
 
